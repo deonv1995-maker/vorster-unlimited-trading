@@ -12,6 +12,15 @@ const money=n=>new Intl.NumberFormat("en-ZA",{style:"currency",currency:"ZAR"}).
 const dateText=v=>new Intl.DateTimeFormat("en-ZA",{dateStyle:"medium"}).format(new Date(v));
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 const statusClass=s=>String(s||"").toLowerCase().replaceAll(" ","-");
+const groupLinesByColour=lines=>{
+  const groups={};
+  for(const line of (lines||[])){
+    const colour=line?.colour?.name||"Standard";
+    if(!groups[colour]) groups[colour]=[];
+    groups[colour].push(line);
+  }
+  return groups;
+};
 const fileToDataUrl=file=>new Promise((resolve,reject)=>{
   const r=new FileReader();
   r.onload=()=>resolve(r.result);
@@ -235,11 +244,13 @@ async function startOrder(existingId=""){
       <div>
         <div class="step-label">Step 1</div>
         <label>Select customer<select id="orderCustomer"><option value="">Choose customer</option>${customers.map(c=>`<option value="${c.id}" ${order.customerId===c.id?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label>
+        <div id="customerSummary" class="customer-summary hidden"></div>
       </div>
       <div>
         <div class="step-label">Step 2</div>
         <label>Choose products</label>
         <input id="catalogueSearch" class="search" placeholder="Search by code or product name">
+        <div id="categoryFilters" class="filter-chips"></div>
         <div id="catalogue" class="product-grid" style="margin-top:10px"></div>
       </div>
       <div id="picker" class="picker-panel hidden"></div>
@@ -254,8 +265,22 @@ async function startOrder(existingId=""){
       <div class="save-actions"><button id="saveDraft" class="secondary">Save draft</button><button id="saveConfirm" class="primary">Save & confirm</button></div>
     </div>`;
   const catalogue=document.getElementById("catalogue"),picker=document.getElementById("picker"),basket=document.getElementById("basket");
+  let activeCategory="All";
+  const categories=["All",...Array.from(new Set(products.map(p=>p.category).filter(Boolean))).sort()];
+  function renderCustomerSummary(){
+    const id=document.getElementById("orderCustomer").value;
+    const box=document.getElementById("customerSummary");
+    const c=customers.find(x=>x.id===id);
+    if(!c){box.classList.add("hidden");box.innerHTML="";return;}
+    box.classList.remove("hidden");
+    box.innerHTML=`<strong>${esc(c.name)}</strong><span>${esc(c.contactPerson||"No contact person")}</span><span>${esc(c.phone||c.whatsapp||"No phone number")}</span><span>${esc(c.preference||"Delivery")}</span>`;
+  }
+  function renderCategoryFilters(){
+    document.getElementById("categoryFilters").innerHTML=categories.map(c=>`<button type="button" class="filter-chip ${c===activeCategory?"selected":""}" data-category="${esc(c)}">${esc(c)}</button>`).join("");
+    document.querySelectorAll(".filter-chip").forEach(b=>b.onclick=()=>{activeCategory=b.dataset.category;renderCategoryFilters();renderCatalogue(document.getElementById("catalogueSearch").value);});
+  }
   function renderCatalogue(filter=""){
-    const shown=products.filter(p=>(p.code+" "+p.name+" "+(p.category||"")).toLowerCase().includes(filter.toLowerCase()));
+    const shown=products.filter(p=>(activeCategory==="All"||p.category===activeCategory)&&(p.code+" "+p.name+" "+(p.category||"")).toLowerCase().includes(filter.toLowerCase()));
     catalogue.innerHTML=shown.map(p=>`
       <button class="product-card" data-id="${p.id}">
         ${p.image?`<img src="${p.image}" alt="${esc(p.name)}">`:`<div class="catalogue-placeholder">▦</div>`}
@@ -318,6 +343,7 @@ async function startOrder(existingId=""){
       <div class="total-row grand"><span>Total</span><span>${money(t.grandTotal)}</span></div>`;
   }
   document.getElementById("catalogueSearch").oninput=e=>renderCatalogue(e.target.value);
+  document.getElementById("orderCustomer").onchange=renderCustomerSummary;
   document.getElementById("delivery").oninput=renderBasket;
   async function saveOrder(status){
     const customerId=document.getElementById("orderCustomer").value;
@@ -331,7 +357,7 @@ async function startOrder(existingId=""){
   }
   document.getElementById("saveDraft").onclick=()=>saveOrder("Draft");
   document.getElementById("saveConfirm").onclick=()=>saveOrder("Confirmed");
-  renderCatalogue();renderBasket();
+  renderCategoryFilters();renderCatalogue();renderBasket();renderCustomerSummary();
 }
 
 async function viewOrder(id){
@@ -346,8 +372,12 @@ async function viewOrder(id){
       </div>
       <p><strong>Customer:</strong> ${esc(o.customerName)}</p>
       <p><strong>Date:</strong> ${dateText(o.createdAt)}</p>
-      <div class="list">${o.lines.map(l=>`
-        <div class="list-item"><div><strong>${esc(l.productCode)} · ${esc(l.productName)}</strong><p class="muted">${esc(l.colour.name)} · Qty ${l.qty}</p></div><strong>${money(l.qty*l.unitPrice)}</strong></div>`).join("")}</div>
+      <div class="colour-groups">${Object.entries(groupLinesByColour(o.lines)).map(([colour,items])=>`
+        <section class="colour-group">
+          <div class="colour-group-head"><h3>${esc(colour)}</h3><span class="badge">${items.reduce((s,x)=>s+Number(x.qty),0)} items</span></div>
+          <div class="list">${items.map(l=>`
+            <div class="list-item"><div><strong>${esc(l.productCode)} · ${esc(l.productName)}</strong><p class="muted">Qty ${l.qty} × ${money(l.unitPrice)}</p></div><strong>${money(l.qty*l.unitPrice)}</strong></div>`).join("")}</div>
+        </section>`).join("")}</div>
       <div class="total-box" style="margin-top:12px">
         <div class="total-row"><span>Subtotal ex VAT</span><strong>${money(o.subtotal)}</strong></div>
         <div class="total-row"><span>Delivery</span><strong>${money(o.delivery)}</strong></div>
@@ -360,8 +390,9 @@ async function viewOrder(id){
       <label>Status<select id="statusSelect">${statuses.map(s=>`<option ${s===o.status?"selected":""}>${s}</option>`).join("")}</select></label>
       <div class="actions" style="margin-top:10px">
         ${o.status==="Draft"?`<button class="secondary" onclick="startOrder('${o.id}')">Edit</button>`:""}
-        <button class="primary" onclick="shareOrder('${o.id}')">Share</button>
+        <button class="primary" onclick="shareOrder('${o.id}')">Share order</button>
         <button class="ghost" onclick="window.print()">Print / Save PDF</button>
+        <button class="ghost" onclick="duplicateOrder('${o.id}')">Duplicate</button>
         <button class="danger" onclick="removeOrder('${o.id}')">Delete</button>
       </div>
     </div>`;
@@ -374,12 +405,29 @@ async function viewOrder(id){
 }
 async function shareOrder(id){
   const o=await getOne("orders",id);
-  const items=o.lines.map(l=>`${l.productCode} ${l.productName} | ${l.colour.name} | Qty ${l.qty} | ${money(l.qty*l.unitPrice)}`).join("\n");
-  const text=`Vorster Unlimited Trading\nOrder ${o.orderNumber}\nCustomer: ${o.customerName}\nStatus: ${o.status}\n\n${items}\n\nTotal: ${money(o.grandTotal)}`;
+  const grouped=Object.entries(groupLinesByColour(o.lines)).map(([colour,items])=>{
+    const lines=items.map(l=>`${l.productCode} ${l.productName} | Qty ${l.qty} | ${money(l.qty*l.unitPrice)}`).join("\n");
+    return `${colour.toUpperCase()}\n${lines}`;
+  }).join("\n\n");
+  const text=`Vorster Unlimited Trading\nOrder ${o.orderNumber}\nCustomer: ${o.customerName}\nStatus: ${o.status}\n\n${grouped}\n\nSubtotal ex VAT: ${money(o.subtotal)}\nVAT: ${money(o.vat)}\nDelivery: ${money(o.delivery)}\nTOTAL: ${money(o.grandTotal)}\n\n072 407 3086 | sales@v-unlimited.com`;
   try{
     if(navigator.share)await navigator.share({title:`Order ${o.orderNumber}`,text});
     else{await navigator.clipboard.writeText(text);notify("Order copied")}
   }catch(err){if(err.name!=="AbortError")alert("Sharing failed. Use Print / Save PDF.")}
+}
+async function duplicateOrder(id){
+  const original=await getOne("orders",id);
+  const copy={
+    ...structuredClone(original),
+    id:uid("ord"),
+    orderNumber:`SO-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
+    status:"Draft",
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString()
+  };
+  await putOne("orders",copy);
+  notify("Order duplicated as draft");
+  viewOrder(copy.id);
 }
 async function removeOrder(id){
   if(confirm("Delete this order permanently?")){await deleteOne("orders",id);notify("Order deleted");navigate("orders")}
@@ -397,7 +445,7 @@ async function settingsPage(){
     </div>
     <div class="card" style="margin-top:12px">
       <h2>Application</h2>
-      <p><strong>Version:</strong> 1.0 Alpha 2</p>
+      <p><strong>Version:</strong> 1.0 Alpha 3</p>
       <p><strong>Currency:</strong> South African Rand</p>
       <p><strong>VAT:</strong> 15%</p>
       <p class="muted">Phone-first local version. Cloud sync will be added later.</p>
