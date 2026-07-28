@@ -1,7 +1,7 @@
 
 const DB_NAME="vorsterTradingV1";
-const DB_VERSION=2;
-const STORES=["products","customers","orders","settings","activities"];
+const DB_VERSION=3;
+const STORES=["products","customers","orders","settings","activities","productionJobs","deliveries"];
 
 function openDB(){
   return new Promise((resolve,reject)=>{

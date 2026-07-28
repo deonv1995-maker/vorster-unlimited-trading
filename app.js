@@ -52,6 +52,8 @@ document.getElementById("installBtn").onclick=async()=>{
 document.querySelectorAll(".bottom-nav button").forEach(b=>b.onclick=()=>navigate(b.dataset.route));
 backBtn.onclick=()=>{
   if(pageTitle.textContent==="Customer details") navigate("customers");
+  else if(pageTitle.textContent==="Production job") navigate("production");
+  else if(pageTitle.textContent==="Delivery details") navigate("deliveries");
   else navigate("orders");
 };
 
@@ -70,23 +72,29 @@ dialog.addEventListener("click",e=>{if(e.target===dialog)closeDialog()});
 
 async function navigate(name){
   route=name;navState(name);backBtn.classList.add("hidden");
-  const titles={dashboard:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",settings:"Settings"};
+  const titles={dashboard:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",production:"Production",deliveries:"Deliveries",settings:"Settings"};
   pageTitle.textContent=titles[name]||"Vorster Unlimited Trading";
   if(name==="dashboard")await dashboard();
   if(name==="products")await productsPage();
   if(name==="customers")await customersPage();
   if(name==="orders")await ordersPage();
+  if(name==="production")await productionPage();
+  if(name==="deliveries")await deliveriesPage();
   if(name==="settings")await settingsPage();
 }
 
 async function dashboard(){
-  const [products,customers,orders]=await Promise.all([getAll("products"),getAll("customers"),getAll("orders")]);
+  const [products,customers,orders,productionJobs,deliveries]=await Promise.all([
+    getAll("products"),getAll("customers"),getAll("orders"),getAll("productionJobs"),getAll("deliveries")
+  ]);
   const activeProducts=products.filter(p=>p.isActive!==false);
   const activeCustomers=customers.filter(c=>c.isActive!==false);
   const drafts=orders.filter(o=>o.status==="Draft").length;
   const confirmed=orders.filter(o=>o.status==="Confirmed").length;
   const production=orders.filter(o=>o.status==="In Production").length;
   const ready=orders.filter(o=>o.status==="Ready").length;
+  const openProduction=productionJobs.filter(j=>!["Completed","Cancelled"].includes(j.status)).length;
+  const scheduledDeliveries=deliveries.filter(d=>!["Delivered","Cancelled"].includes(d.status)).length;
   const value=orders.filter(o=>o.status!=="Cancelled").reduce((s,o)=>s+Number(o.grandTotal||0),0);
   const recent=[...orders].sort((a,b)=>new Date(b.updatedAt||b.createdAt)-new Date(a.updatedAt||a.createdAt)).slice(0,4);
 
@@ -119,6 +127,8 @@ async function dashboard(){
       <button class="quick-card" onclick="navigate('products')"><span>▦</span><strong>Products</strong><small>Catalogue and colours</small></button>
       <button class="quick-card" onclick="navigate('customers')"><span>◉</span><strong>Customers</strong><small>Contacts and notes</small></button>
       <button class="quick-card" onclick="navigate('orders')"><span>▤</span><strong>Orders</strong><small>Drafts and statuses</small></button>
+      <button class="quick-card" onclick="navigate('production')"><span>🏭</span><strong>Production</strong><small>${openProduction} open jobs</small></button>
+      <button class="quick-card" onclick="navigate('deliveries')"><span>🚚</span><strong>Deliveries</strong><small>${scheduledDeliveries} scheduled</small></button>
       <button class="quick-card" onclick="navigate('settings')"><span>⚙</span><strong>Settings</strong><small>Backups and colours</small></button>
     </div>
 
@@ -655,6 +665,8 @@ async function viewOrder(id){
         <button class="primary" onclick="shareOrder('${o.id}')">Share order</button>
         <button class="ghost" onclick="window.print()">Print / Save PDF</button>
         <button class="ghost" onclick="duplicateOrder('${o.id}')">Duplicate</button>
+        ${["Confirmed","In Production"].includes(o.status)?`<button class="secondary" onclick="createProductionJob('${o.id}')">Production job</button>`:""}
+        ${["Ready","Delivered"].includes(o.status)?`<button class="secondary" onclick="scheduleDelivery('${o.id}')">Schedule delivery</button>`:""}
         <button class="danger" onclick="removeOrder('${o.id}')">Delete</button>
       </div>
     </div>`;
@@ -695,6 +707,169 @@ async function removeOrder(id){
   if(confirm("Delete this order permanently?")){await deleteOne("orders",id);notify("Order deleted");navigate("orders")}
 }
 
+
+async function createProductionJob(orderId){
+  const [order,jobs]=await Promise.all([getOne("orders",orderId),getAll("productionJobs")]);
+  const existing=jobs.find(j=>j.orderId===orderId && j.status!=="Cancelled");
+  if(existing){notify("Production job already exists");return viewProductionJob(existing.id);}
+  const job={
+    id:uid("job"),
+    jobNumber:`JOB-${String(Date.now()).slice(-6)}`,
+    orderId,
+    orderNumber:order.orderNumber,
+    customerId:order.customerId,
+    customerName:order.customerName,
+    status:"Pending",
+    lines:structuredClone(order.lines||[]),
+    notes:"",
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString()
+  };
+  await putOne("productionJobs",job);
+  if(order.status==="Confirmed"){order.status="In Production";order.updatedAt=new Date().toISOString();await putOne("orders",order);}
+  notify("Production job created");
+  viewProductionJob(job.id);
+}
+
+async function productionPage(){
+  const jobs=(await getAll("productionJobs")).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  main.innerHTML=`
+    <div class="section-head"><h2>Production jobs</h2></div>
+    <div class="filter-chips" id="productionFilters">
+      <button class="filter-chip selected" data-status="All">All</button>
+      <button class="filter-chip" data-status="Pending">Pending</button>
+      <button class="filter-chip" data-status="In Progress">In Progress</button>
+      <button class="filter-chip" data-status="Completed">Completed</button>
+    </div>
+    <div id="productionList" class="list"></div>`;
+  const render=status=>{
+    const shown=status==="All"?jobs:jobs.filter(j=>j.status===status);
+    document.getElementById("productionList").innerHTML=shown.length?shown.map(j=>`
+      <button class="list-item" style="width:100%;text-align:left" onclick="viewProductionJob('${j.id}')">
+        <div><h3>${esc(j.jobNumber)} · ${esc(j.customerName)}</h3><p class="muted">${esc(j.orderNumber)} · ${dateText(j.createdAt)}</p><span class="badge ${statusClass(j.status)}">${esc(j.status)}</span></div>
+        <strong>${(j.lines||[]).reduce((s,l)=>s+Number(l.qty||0),0)} items</strong>
+      </button>`).join(""):`<div class="empty">No production jobs found.</div>`;
+  };
+  document.querySelectorAll("#productionFilters button").forEach(b=>b.onclick=()=>{
+    document.querySelectorAll("#productionFilters button").forEach(x=>x.classList.remove("selected"));
+    b.classList.add("selected");render(b.dataset.status);
+  });
+  render("All");
+}
+
+async function viewProductionJob(id){
+  const job=await getOne("productionJobs",id);
+  if(!job)return navigate("production");
+  pageTitle.textContent="Production job";
+  backBtn.classList.remove("hidden");
+  main.innerHTML=`
+    <div class="card">
+      <div class="order-doc-head"><div><div class="step-label">Production job</div><h2>${esc(job.jobNumber)}</h2><span class="badge ${statusClass(job.status)}">${esc(job.status)}</span></div><img src="vorster-logo.jpg" alt=""></div>
+      <p><strong>Order:</strong> ${esc(job.orderNumber)}</p>
+      <p><strong>Customer:</strong> ${esc(job.customerName)}</p>
+      <div class="colour-groups">${Object.entries(groupLinesByColour(job.lines)).map(([colour,items])=>`
+        <section class="colour-group">
+          <div class="colour-group-head"><h3>${esc(colour)}</h3><span class="badge">${items.reduce((s,x)=>s+Number(x.qty),0)} items</span></div>
+          <div class="list">${items.map(l=>`<div class="list-item"><div><strong>${esc(l.productCode)} · ${esc(l.productName)}</strong><p class="muted">Qty ${l.qty}</p></div></div>`).join("")}</div>
+        </section>`).join("")}</div>
+    </div>
+    <div class="card no-print" style="margin-top:12px">
+      <label>Status<select id="jobStatus">
+        ${["Pending","In Progress","Completed","Cancelled"].map(s=>`<option ${s===job.status?"selected":""}>${s}</option>`).join("")}
+      </select></label>
+      <label>Production notes<textarea id="jobNotes">${esc(job.notes||"")}</textarea></label>
+      <button id="saveJob" class="primary">Save production job</button>
+    </div>`;
+  document.getElementById("saveJob").onclick=async()=>{
+    const previous=job.status;
+    job.status=document.getElementById("jobStatus").value;
+    job.notes=document.getElementById("jobNotes").value;
+    job.updatedAt=new Date().toISOString();
+    await putOne("productionJobs",job);
+    if(job.status==="Completed"&&previous!=="Completed"){
+      const order=await getOne("orders",job.orderId);
+      if(order){order.status="Ready";order.updatedAt=new Date().toISOString();await putOne("orders",order);}
+    }
+    notify("Production job saved");
+    viewProductionJob(id);
+  };
+}
+
+async function scheduleDelivery(orderId){
+  const [order,deliveries]=await Promise.all([getOne("orders",orderId),getAll("deliveries")]);
+  const existing=deliveries.find(d=>d.orderId===orderId && d.status!=="Cancelled");
+  if(existing){notify("Delivery already scheduled");return viewDelivery(existing.id);}
+  openDialog(`
+    <div class="dialog-head"><h2>Schedule delivery</h2><button class="close-btn" onclick="closeDialog()">×</button></div>
+    <form id="deliveryForm">
+      <label>Delivery date<input name="deliveryDate" type="date" required></label>
+      <label>Vehicle<select name="vehicle"><option>Bakkie 1</option><option>Bakkie 2</option><option>Other</option></select></label>
+      <label>Driver<input name="driver" placeholder="Driver name"></label>
+      <label>Notes<textarea name="notes"></textarea></label>
+      <button class="primary" type="submit">Schedule delivery</button>
+    </form>`);
+  document.getElementById("deliveryForm").onsubmit=async e=>{
+    e.preventDefault();
+    const d=Object.fromEntries(new FormData(e.target));
+    const delivery={id:uid("del"),orderId,orderNumber:order.orderNumber,customerId:order.customerId,customerName:order.customerName,status:"Scheduled",createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),...d};
+    await putOne("deliveries",delivery);
+    closeDialog();notify("Delivery scheduled");viewDelivery(delivery.id);
+  };
+}
+
+async function deliveriesPage(){
+  const deliveries=(await getAll("deliveries")).sort((a,b)=>String(a.deliveryDate).localeCompare(String(b.deliveryDate)));
+  main.innerHTML=`
+    <div class="section-head"><h2>Delivery schedule</h2></div>
+    <div class="list">${deliveries.length?deliveries.map(d=>`
+      <button class="list-item" style="width:100%;text-align:left" onclick="viewDelivery('${d.id}')">
+        <div><h3>${esc(d.customerName)}</h3><p>${esc(d.orderNumber)} · ${esc(d.vehicle||"Vehicle not set")}</p><p class="muted">${d.deliveryDate?dateText(d.deliveryDate):"No date"}</p><span class="badge ${statusClass(d.status)}">${esc(d.status)}</span></div>
+        <strong>${esc(d.driver||"No driver")}</strong>
+      </button>`).join(""):`<div class="empty">No deliveries scheduled.</div>`}</div>`;
+}
+
+async function viewDelivery(id){
+  const delivery=await getOne("deliveries",id);
+  if(!delivery)return navigate("deliveries");
+  pageTitle.textContent="Delivery details";
+  backBtn.classList.remove("hidden");
+  main.innerHTML=`
+    <div class="card">
+      <div class="step-label">Delivery</div>
+      <h2>${esc(delivery.customerName)}</h2>
+      <p><strong>Order:</strong> ${esc(delivery.orderNumber)}</p>
+      <p><strong>Date:</strong> ${delivery.deliveryDate?dateText(delivery.deliveryDate):"Not set"}</p>
+      <p><strong>Vehicle:</strong> ${esc(delivery.vehicle||"—")}</p>
+      <p><strong>Driver:</strong> ${esc(delivery.driver||"—")}</p>
+      <p><strong>Notes:</strong> ${esc(delivery.notes||"—")}</p>
+      <span class="badge ${statusClass(delivery.status)}">${esc(delivery.status)}</span>
+    </div>
+    <div class="card no-print" style="margin-top:12px">
+      <label>Status<select id="deliveryStatus">${["Scheduled","Loaded","Out for Delivery","Delivered","Cancelled"].map(s=>`<option ${s===delivery.status?"selected":""}>${s}</option>`).join("")}</select></label>
+      <label>Delivery date<input id="deliveryDateEdit" type="date" value="${esc(delivery.deliveryDate||"")}"></label>
+      <label>Vehicle<select id="deliveryVehicle"><option ${delivery.vehicle==="Bakkie 1"?"selected":""}>Bakkie 1</option><option ${delivery.vehicle==="Bakkie 2"?"selected":""}>Bakkie 2</option><option ${delivery.vehicle==="Other"?"selected":""}>Other</option></select></label>
+      <label>Driver<input id="deliveryDriver" value="${esc(delivery.driver||"")}"></label>
+      <label>Notes<textarea id="deliveryNotes">${esc(delivery.notes||"")}</textarea></label>
+      <button id="saveDelivery" class="primary">Save delivery</button>
+    </div>`;
+  document.getElementById("saveDelivery").onclick=async()=>{
+    const previous=delivery.status;
+    delivery.status=document.getElementById("deliveryStatus").value;
+    delivery.deliveryDate=document.getElementById("deliveryDateEdit").value;
+    delivery.vehicle=document.getElementById("deliveryVehicle").value;
+    delivery.driver=document.getElementById("deliveryDriver").value;
+    delivery.notes=document.getElementById("deliveryNotes").value;
+    delivery.updatedAt=new Date().toISOString();
+    await putOne("deliveries",delivery);
+    if(delivery.status==="Delivered"&&previous!=="Delivered"){
+      const order=await getOne("orders",delivery.orderId);
+      if(order){order.status="Delivered";order.updatedAt=new Date().toISOString();await putOne("orders",order);}
+    }
+    notify("Delivery saved");
+    viewDelivery(id);
+  };
+}
+
 async function settingsPage(){
   const settings=(await getAll("settings"))[0]||{id:"app_settings",companyColours:[
     {name:"Charcoal",hex:"#4a4a4a"},
@@ -726,7 +901,7 @@ async function settingsPage(){
 
     <div class="card" style="margin-top:12px">
       <h2>Application</h2>
-      <p><strong>Version:</strong> 1.0 Alpha 5</p>
+      <p><strong>Version:</strong> 1.0 Alpha 6</p>
       <p><strong>Currency:</strong> South African Rand</p>
       <p><strong>VAT:</strong> 15%</p>
       <p class="muted">Phone-first local version. Cloud sync will be added later.</p>

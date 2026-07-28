@@ -157,3 +157,7 @@ dialog::backdrop{background:rgba(0,0,0,.48)}
 @media(max-width:430px){
   .contact-grid,.pattern-grid{grid-template-columns:1fr}
 }
+
+.badge.pending{background:#f5ead2;color:#795c1f}
+.badge.in-progress,.badge.loaded,.badge.out-for-delivery{background:#dbe7f5;color:#294e79}
+.badge.scheduled{background:#eee3f5;color:#5d3579}
