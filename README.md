@@ -1,44 +1,37 @@
-# Vorster Unlimited Trading v1 — Alpha 7.2.2
+# Vorster Unlimited Trading v1 — Alpha 7.3.1
 
-Automatic Order History and Predictions.
+Smart Dashboard.
 
 ## New in this sprint
 
-- Sales Visits is replaced by Customer Order Intelligence
-- Predictions are calculated automatically from completed order history
-- No detailed visit form is required
-- Customer status: Overdue, Due soon, Recent or Learning
-- Predicted next-order date
-- Typical ordering interval
-- Prediction confidence
-- Average order value
+- Daily business briefing
+- Needs-attention list
+- Deliveries due today and overdue
+- Production jobs open for seven days or longer
+- Quotes expired or expiring within three days
+- Customers predicted overdue or due soon
+- Ranked sales opportunities
 - Expected order-value range
-- Likely products with predicted average quantities
-- Preferred colours
-- Complete customer order history
-- Latest quote link
-- Dashboard predicted-orders section
-- Optional one-tap no-order result:
-  - No order today
-  - Customer unavailable
-  - Follow up later
-- Existing orders, quotes, customers and Alpha 7.2.1 visit data remain compatible
-
-## Prediction rules
-
-- One order: not enough history
-- Two orders: early estimate
-- Three or more orders: active prediction
-- Six or more orders: higher confidence
-- Predictions use the customer's typical interval between completed orders
-- Expected value uses recent order values with a practical range
+- Likely product recommendation
+- Automatically generated daily action list
+- Current-month turnover
+- Month-on-month turnover comparison
+- Current-month order count
+- Average order value
+- Quote conversion rate
+- Top products this month
+- Top customers this month
+- Top colours this month
+- Direct links from every dashboard alert to the relevant record
+- Existing Alpha 7.2.2 data remains compatible
 
 ## Test flow
 
-1. Open Predict / Order Intelligence.
-2. Open a customer with several completed orders.
-3. Check predicted date, interval, products, quantities and colours.
-4. Create another completed order for that customer.
-5. Return to Order Intelligence and confirm the figures update automatically.
-6. Test the optional No-order result.
-7. Confirm no detailed visit form is required.
+1. Open the Dashboard.
+2. Check Business Health figures.
+3. Open an item under Needs Attention.
+4. Open a ranked Sales Opportunity.
+5. Follow an item in Today's Action List.
+6. Confirm top products, customers and colours use this month's orders.
+7. Mark a delivery Delivered and confirm it disappears from attention.
+8. Convert a quote and confirm the conversion rate updates.

@@ -149,44 +149,152 @@ async function dashboard(){
   const [products,customers,visits,quotes,orders,productionJobs,deliveries]=await Promise.all([
     getAll("products"),getAll("customers"),getAll("visits"),getAll("quotes"),getAll("orders"),getAll("productionJobs"),getAll("deliveries")
   ]);
+  const today=new Date();
+  const todayKey=today.toISOString().slice(0,10);
+  const monthStart=new Date(today.getFullYear(),today.getMonth(),1);
+  const previousMonthStart=new Date(today.getFullYear(),today.getMonth()-1,1);
   const activeProducts=products.filter(p=>p.isActive!==false);
   const activeCustomers=customers.filter(c=>c.isActive!==false);
-  const drafts=orders.filter(o=>o.status==="Draft").length;
+  const completedOrders=orders.filter(o=>!["Cancelled","Draft"].includes(o.status));
+  const currentMonthOrders=completedOrders.filter(o=>new Date(o.createdAt)>=monthStart);
+  const previousMonthOrders=completedOrders.filter(o=>{
+    const d=new Date(o.createdAt);
+    return d>=previousMonthStart&&d<monthStart;
+  });
+  const monthTurnover=currentMonthOrders.reduce((s,o)=>s+Number(o.grandTotal||0),0);
+  const previousTurnover=previousMonthOrders.reduce((s,o)=>s+Number(o.grandTotal||0),0);
+  const turnoverChange=previousTurnover?Math.round(((monthTurnover-previousTurnover)/previousTurnover)*100):null;
+  const averageOrder=currentMonthOrders.length?monthTurnover/currentMonthOrders.length:0;
+  const monthQuotes=quotes.filter(q=>new Date(q.createdAt)>=monthStart);
+  const convertedQuotes=monthQuotes.filter(q=>q.status==="Converted").length;
+  const conversionRate=monthQuotes.length?Math.round((convertedQuotes/monthQuotes.length)*100):0;
   const predictionRows=activeCustomers.map(c=>({customer:c,insight:customerInsight(orders,c.id)}));
   const dueCustomers=predictionRows.filter(x=>["Overdue","Due soon"].includes(x.insight.status));
-  const openQuotes=quotes.filter(q=>["Draft","Sent","Accepted"].includes(q.status)).length;
-  const confirmed=orders.filter(o=>o.status==="Confirmed").length;
-  const production=orders.filter(o=>o.status==="In Production").length;
-  const ready=orders.filter(o=>o.status==="Ready").length;
+
+  const openQuotes=quotes.filter(q=>["Draft","Sent","Accepted"].includes(q.status));
+  const expiringQuotes=openQuotes.filter(q=>{
+    if(!q.validUntil)return false;
+    const days=Math.ceil((new Date(q.validUntil)-today)/86400000);
+    return days>=0&&days<=3;
+  });
+  const overdueQuotes=openQuotes.filter(q=>q.validUntil&&new Date(q.validUntil)<new Date(todayKey));
+  const todayDeliveries=deliveries.filter(d=>d.deliveryDate===todayKey&&!["Delivered","Cancelled"].includes(d.status));
+  const overdueDeliveries=deliveries.filter(d=>d.deliveryDate&&d.deliveryDate<todayKey&&!["Delivered","Cancelled"].includes(d.status));
+  const oldProduction=productionJobs.filter(j=>!["Completed","Cancelled"].includes(j.status)&&daysBetween(j.createdAt,today)>=7);
   const openProduction=productionJobs.filter(j=>!["Completed","Cancelled"].includes(j.status)).length;
   const scheduledDeliveries=deliveries.filter(d=>!["Delivered","Cancelled"].includes(d.status)).length;
-  const value=orders.filter(o=>o.status!=="Cancelled").reduce((s,o)=>s+Number(o.grandTotal||0),0);
-  const recent=[...orders].sort((a,b)=>new Date(b.updatedAt||b.createdAt)-new Date(a.updatedAt||a.createdAt)).slice(0,4);
+
+  const productStats={};
+  const colourStats={};
+  const customerStats={};
+  currentMonthOrders.forEach(o=>{
+    if(!customerStats[o.customerId])customerStats[o.customerId]={name:o.customerName,value:0,orders:0};
+    customerStats[o.customerId].value+=Number(o.grandTotal||0);
+    customerStats[o.customerId].orders+=1;
+    (o.lines||[]).forEach(l=>{
+      const key=l.productId||`${l.productCode}|${l.productName}`;
+      if(!productStats[key])productStats[key]={code:l.productCode||"",name:l.productName||"",qty:0,value:0};
+      productStats[key].qty+=Number(l.qty||0);
+      productStats[key].value+=Number(l.qty||0)*Number(l.unitPrice||0);
+      const colour=l?.colour?.name||"Standard";
+      colourStats[colour]=(colourStats[colour]||0)+Number(l.qty||0);
+    });
+  });
+  const topProducts=Object.values(productStats).sort((a,b)=>b.qty-a.qty).slice(0,5);
+  const topCustomers=Object.values(customerStats).sort((a,b)=>b.value-a.value).slice(0,5);
+  const topColours=Object.entries(colourStats).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  const attention=[];
+  overdueDeliveries.forEach(d=>attention.push({priority:0,type:"Delivery overdue",title:d.customerName,detail:`${d.orderNumber} was due ${dateText(d.deliveryDate)}`,action:`viewDelivery('${d.id}')`}));
+  todayDeliveries.forEach(d=>attention.push({priority:1,type:"Delivery today",title:d.customerName,detail:`${d.orderNumber} · ${d.vehicle||"Vehicle not set"}`,action:`viewDelivery('${d.id}')`}));
+  oldProduction.forEach(j=>attention.push({priority:1,type:"Production delayed",title:j.customerName,detail:`${j.jobNumber} has been open ${daysBetween(j.createdAt,today)} days`,action:`viewProductionJob('${j.id}')`}));
+  overdueQuotes.forEach(q=>attention.push({priority:2,type:"Quote expired",title:q.customerName,detail:`${q.quoteNumber} · ${money(q.grandTotal)}`,action:`viewQuote('${q.id}')`}));
+  expiringQuotes.forEach(q=>attention.push({priority:3,type:"Quote expiring",title:q.customerName,detail:`${q.quoteNumber} expires ${dateText(q.validUntil)}`,action:`viewQuote('${q.id}')`}));
+  dueCustomers.slice(0,6).forEach(x=>attention.push({
+    priority:x.insight.status==="Overdue"?2:4,
+    type:x.insight.status==="Overdue"?"Customer overdue":"Customer due soon",
+    title:x.customer.name,
+    detail:`${x.insight.daysSince} days since last order${x.insight.predictedDate?` · predicted ${dateText(x.insight.predictedDate)}`:""}`,
+    action:`viewCustomerIntelligence('${x.customer.id}')`
+  }));
+  attention.sort((a,b)=>a.priority-b.priority);
+
+  const opportunities=predictionRows
+    .filter(x=>["Overdue","Due soon"].includes(x.insight.status))
+    .map(x=>{
+      const overdueDays=x.insight.predictedDate?Math.max(0,Math.round((today-new Date(x.insight.predictedDate))/86400000)):0;
+      let score=50;
+      if(x.insight.status==="Overdue")score+=20;
+      score+=Math.min(15,overdueDays);
+      score+=x.insight.confidence==="High"?15:x.insight.confidence==="Medium"?8:0;
+      return {...x,score:Math.min(99,score)};
+    })
+    .sort((a,b)=>b.score-a.score)
+    .slice(0,5);
+
+  const actionItems=[
+    ...todayDeliveries.slice(0,2).map(d=>({text:`Prepare delivery for ${d.customerName}`,action:`viewDelivery('${d.id}')`})),
+    ...oldProduction.slice(0,2).map(j=>({text:`Check production job ${j.jobNumber}`,action:`viewProductionJob('${j.id}')`})),
+    ...opportunities.slice(0,3).map(x=>({text:`Contact ${x.customer.name} about their next order`,action:`viewCustomerIntelligence('${x.customer.id}')`})),
+    ...expiringQuotes.slice(0,2).map(q=>({text:`Follow up on ${q.quoteNumber}`,action:`viewQuote('${q.id}')`}))
+  ].slice(0,7);
 
   main.innerHTML=`
-    <section class="hero-card">
+    <section class="hero-card smart-hero">
       <div>
-        <div class="step-label">Business overview</div>
-        <h2>Welcome back</h2>
-        <p>Manage products, customers and orders from your phone.</p>
+        <div class="step-label">Daily business briefing</div>
+        <h2>${new Intl.DateTimeFormat("en-ZA",{weekday:"long",day:"numeric",month:"long"}).format(today)}</h2>
+        <p>${attention.length?`${attention.length} item${attention.length===1?"":"s"} need attention today.`:"Everything currently looks under control."}</p>
       </div>
       <button class="primary hero-order-btn" onclick="startOrder()">+ New order</button>
     </section>
 
-    <div class="grid two dashboard-stats">
-      <div class="card stat"><span class="muted">Active products</span><strong>${activeProducts.length}</strong></div>
-      <div class="card stat"><span class="muted">Active customers</span><strong>${activeCustomers.length}</strong></div>
-      <div class="card stat"><span class="muted">Customers due</span><strong>${dueCustomers.length}</strong></div>
-      <div class="card stat"><span class="muted">Open quotes</span><strong>${openQuotes}</strong></div>
-      <div class="card stat"><span class="muted">Draft orders</span><strong>${drafts}</strong></div>
-      <div class="card stat"><span class="muted">Confirmed</span><strong>${confirmed}</strong></div>
-      <div class="card stat"><span class="muted">In production</span><strong>${production}</strong></div>
-      <div class="card stat"><span class="muted">Ready</span><strong>${ready}</strong></div>
+    <div class="section-head"><h2>Business health this month</h2></div>
+    <div class="grid two smart-health-grid">
+      <div class="card stat"><span class="muted">Turnover</span><strong>${money(monthTurnover)}</strong><small>${turnoverChange===null?"No previous comparison":`${turnoverChange>=0?"+":""}${turnoverChange}% vs last month`}</small></div>
+      <div class="card stat"><span class="muted">Orders</span><strong>${currentMonthOrders.length}</strong><small>Completed and active</small></div>
+      <div class="card stat"><span class="muted">Average order</span><strong>${money(averageOrder)}</strong><small>Current month</small></div>
+      <div class="card stat"><span class="muted">Quote conversion</span><strong>${conversionRate}%</strong><small>${convertedQuotes} of ${monthQuotes.length} quotes</small></div>
     </div>
 
-    <div class="card value-card">
-      <span class="muted">Recorded order value</span>
-      <h2>${money(value)}</h2>
+    <div class="section-head"><h2>Needs attention</h2><span class="badge">${attention.length}</span></div>
+    <div class="list attention-list">
+      ${attention.length?attention.slice(0,8).map(a=>`
+        <button class="list-item attention-item priority-${a.priority}" style="width:100%;text-align:left" onclick="${a.action}">
+          <div><span class="attention-type">${esc(a.type)}</span><h3>${esc(a.title)}</h3><p class="muted">${esc(a.detail)}</p></div><span>›</span>
+        </button>`).join(""):`<div class="empty success-empty">No urgent items right now.</div>`}
+    </div>
+
+    <div class="section-head"><h2>Sales opportunities</h2><button class="ghost" onclick="navigate('visits')">View all</button></div>
+    <div class="list opportunity-list">
+      ${opportunities.length?opportunities.map((x,index)=>`
+        <button class="list-item opportunity-item" style="width:100%;text-align:left" onclick="viewCustomerIntelligence('${x.customer.id}')">
+          <div class="opportunity-rank">${index+1}</div>
+          <div class="opportunity-main"><h3>${esc(x.customer.name)}</h3><p class="muted">${x.insight.statusLabel} · Expected ${money(x.insight.lowValue)}–${money(x.insight.highValue)}</p><small>${x.insight.products[0]?`Likely: ${esc(x.insight.products[0].code)} × approximately ${x.insight.products[0].averageQty}`:"Product pattern still learning"}</small></div>
+          <div class="opportunity-score"><strong>${x.score}%</strong><small>priority</small></div>
+        </button>`).join(""):`<div class="empty">More completed order history is needed before opportunities can be ranked.</div>`}
+    </div>
+
+    <div class="section-head"><h2>Today’s action list</h2></div>
+    <div class="card action-checklist">
+      ${actionItems.length?actionItems.map((a,index)=>`
+        <button onclick="${a.action}"><span class="action-number">${index+1}</span><span>${esc(a.text)}</span><span>›</span></button>`).join(""):`<p class="muted">No priority actions have been generated today.</p>`}
+    </div>
+
+    <div class="section-head"><h2>Top performance this month</h2></div>
+    <div class="smart-performance-grid">
+      <div class="card">
+        <h3>Top products</h3>
+        ${topProducts.length?topProducts.map((p,i)=>`<div class="performance-row"><span>${i+1}. ${esc(p.code)} · ${esc(p.name)}</span><strong>${p.qty}</strong></div>`).join(""):`<p class="muted">No product sales this month.</p>`}
+      </div>
+      <div class="card">
+        <h3>Top customers</h3>
+        ${topCustomers.length?topCustomers.map((c,i)=>`<div class="performance-row"><span>${i+1}. ${esc(c.name)}</span><strong>${money(c.value)}</strong></div>`).join(""):`<p class="muted">No customer sales this month.</p>`}
+      </div>
+      <div class="card">
+        <h3>Top colours</h3>
+        ${topColours.length?topColours.map(([name,qty],i)=>`<div class="performance-row"><span>${i+1}. ${esc(name)}</span><strong>${qty}</strong></div>`).join(""):`<p class="muted">No colour sales this month.</p>`}
+      </div>
     </div>
 
     <div class="section-head"><h2>Quick access</h2></div>
@@ -194,30 +302,12 @@ async function dashboard(){
       <button class="quick-card" onclick="navigate('products')"><span>▦</span><strong>Products</strong><small>Catalogue and colours</small></button>
       <button class="quick-card" onclick="navigate('customers')"><span>◉</span><strong>Customers</strong><small>Contacts and notes</small></button>
       <button class="quick-card" onclick="navigate('visits')"><span>⌖</span><strong>Order intelligence</strong><small>${dueCustomers.length} customers due</small></button>
-      <button class="quick-card" onclick="navigate('quotes')"><span>▧</span><strong>Quotes</strong><small>${openQuotes} open quotes</small></button>
-      <button class="quick-card" onclick="navigate('orders')"><span>▤</span><strong>Orders</strong><small>Drafts and statuses</small></button>
+      <button class="quick-card" onclick="navigate('quotes')"><span>▧</span><strong>Quotes</strong><small>${openQuotes.length} open quotes</small></button>
+      <button class="quick-card" onclick="navigate('orders')"><span>▤</span><strong>Orders</strong><small>${orders.filter(o=>o.status==="Confirmed").length} confirmed</small></button>
       <button class="quick-card" onclick="navigate('production')"><span>🏭</span><strong>Production</strong><small>${openProduction} open jobs</small></button>
       <button class="quick-card" onclick="navigate('deliveries')"><span>🚚</span><strong>Deliveries</strong><small>${scheduledDeliveries} scheduled</small></button>
       <button class="quick-card" onclick="navigate('settings')"><span>⚙</span><strong>Settings</strong><small>Backups and colours</small></button>
     </div>
-
-    <div class="section-head"><h2>Predicted orders</h2><button class="ghost" onclick="navigate('visits')">View all</button></div>
-    <div class="list">${predictionRows
-      .filter(x=>["Overdue","Due soon"].includes(x.insight.status))
-      .sort((a,b)=>(b.insight.daysSince||0)-(a.insight.daysSince||0))
-      .slice(0,4)
-      .map(x=>`
-        <button class="list-item" style="width:100%;text-align:left" onclick="viewCustomerIntelligence('${x.customer.id}')">
-          <div><h3>${esc(x.customer.name)}</h3><p class="muted">${x.insight.daysSince} days since last order · ${x.insight.statusLabel}</p></div>
-          <div style="text-align:right"><strong>${x.insight.predictedDate?dateText(x.insight.predictedDate):"Learning"}</strong><small class="muted" style="display:block">Predicted</small></div>
-        </button>`).join("")||`<div class="empty">No customers are predicted due yet.</div>`}</div>
-
-    <div class="section-head"><h2>Recent orders</h2></div>
-    <div class="list">${recent.length?recent.map(o=>`
-      <button class="list-item" style="width:100%;text-align:left" onclick="viewOrder('${o.id}')">
-        <div><h3>${esc(o.orderNumber)} · ${esc(o.customerName)}</h3><p class="muted">${dateText(o.createdAt)}</p><span class="badge ${statusClass(o.status)}">${esc(o.status)}</span></div>
-        <strong>${money(o.grandTotal)}</strong>
-      </button>`).join(""):`<div class="empty">No recent orders yet.</div>`}</div>
 
     <button class="new-order-fab" onclick="startOrder()">+ New order</button>`;
 }
@@ -1587,7 +1677,7 @@ async function settingsPage(){
 
     <div class="card" style="margin-top:12px">
       <h2>Application</h2>
-      <p><strong>Version:</strong> 1.0 Alpha 7.2.2</p>
+      <p><strong>Version:</strong> 1.0 Alpha 7.3.1</p>
       <p><strong>Currency:</strong> South African Rand</p>
       <p><strong>VAT:</strong> 15%</p>
       <p class="muted">Phone-first local version. Cloud sync will be added later.</p>
