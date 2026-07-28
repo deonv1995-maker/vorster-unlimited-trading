@@ -1,24 +1,23 @@
-# Vorster Unlimited Trading v1 — Alpha 3
+# Vorster Unlimited Trading v1 — Alpha 4
 
-Ordering workflow update.
+Product, customer and dashboard management phase.
 
-## New in Alpha 3
+## New in Alpha 4
 
-- Customer summary after selection
-- Product category filter chips
-- Product search remains available
-- Order details grouped by colour
-- Shared order text grouped by colour
-- Duplicate any order into a new Draft
-- Improved order action labels
-- Existing Alpha 2 data remains compatible
+- Premium dashboard redesign
+- Always-visible New Order button
+- Product catalogue cards with images
+- Active, Archived and All product filters
+- Edit, duplicate, archive, restore and delete products
+- Reusable company colour library in Settings
+- Add saved company colours to products with one tap
+- Improved customer cards
+- Customer notes, telephone, WhatsApp and delivery preference shown
+- New Order button directly from a customer
+- Archive and restore customers
+- Archived products and customers are excluded from new orders
+- Existing Alpha 3 data remains compatible
 
-## Test flow
+## Important
 
-1. Select a customer.
-2. Filter or search the catalogue.
-3. Tap a product.
-4. Select a colour tile and quantity.
-5. Add more products.
-6. Save as Draft or Confirmed.
-7. Open the order, share it, change its status, or duplicate it.
+Test archive and restore with sample products and customers before entering the full database.

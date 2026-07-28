@@ -71,50 +71,115 @@ async function navigate(name){
 
 async function dashboard(){
   const [products,customers,orders]=await Promise.all([getAll("products"),getAll("customers"),getAll("orders")]);
+  const activeProducts=products.filter(p=>p.isActive!==false);
+  const activeCustomers=customers.filter(c=>c.isActive!==false);
   const drafts=orders.filter(o=>o.status==="Draft").length;
   const confirmed=orders.filter(o=>o.status==="Confirmed").length;
+  const production=orders.filter(o=>o.status==="In Production").length;
+  const ready=orders.filter(o=>o.status==="Ready").length;
   const value=orders.filter(o=>o.status!=="Cancelled").reduce((s,o)=>s+Number(o.grandTotal||0),0);
+  const recent=[...orders].sort((a,b)=>new Date(b.updatedAt||b.createdAt)-new Date(a.updatedAt||a.createdAt)).slice(0,4);
+
   main.innerHTML=`
-    <div class="grid two">
-      <div class="card stat"><span class="muted">Products</span><strong>${products.length}</strong></div>
-      <div class="card stat"><span class="muted">Customers</span><strong>${customers.length}</strong></div>
+    <section class="hero-card">
+      <div>
+        <div class="step-label">Business overview</div>
+        <h2>Welcome back</h2>
+        <p>Manage products, customers and orders from your phone.</p>
+      </div>
+      <button class="primary hero-order-btn" onclick="startOrder()">+ New order</button>
+    </section>
+
+    <div class="grid two dashboard-stats">
+      <div class="card stat"><span class="muted">Active products</span><strong>${activeProducts.length}</strong></div>
+      <div class="card stat"><span class="muted">Active customers</span><strong>${activeCustomers.length}</strong></div>
       <div class="card stat"><span class="muted">Draft orders</span><strong>${drafts}</strong></div>
       <div class="card stat"><span class="muted">Confirmed</span><strong>${confirmed}</strong></div>
+      <div class="card stat"><span class="muted">In production</span><strong>${production}</strong></div>
+      <div class="card stat"><span class="muted">Ready</span><strong>${ready}</strong></div>
     </div>
-    <div class="card" style="margin-top:12px"><span class="muted">Recorded order value</span><h2>${money(value)}</h2></div>
-    <div class="section-head"><h2>Quick actions</h2></div>
-    <div class="quick-grid">
-      <button class="quick-card" onclick="startOrder()"><span>▤</span><strong>New order</strong></button>
-      <button class="quick-card" onclick="showProductForm()"><span>▦</span><strong>Add product</strong></button>
-      <button class="quick-card" onclick="showCustomerForm()"><span>◉</span><strong>Add customer</strong></button>
-      <button class="quick-card" onclick="navigate('settings')"><span>⬇</span><strong>Backup</strong></button>
-    </div>`;
+
+    <div class="card value-card">
+      <span class="muted">Recorded order value</span>
+      <h2>${money(value)}</h2>
+    </div>
+
+    <div class="section-head"><h2>Quick access</h2></div>
+    <div class="quick-grid premium">
+      <button class="quick-card" onclick="navigate('products')"><span>▦</span><strong>Products</strong><small>Catalogue and colours</small></button>
+      <button class="quick-card" onclick="navigate('customers')"><span>◉</span><strong>Customers</strong><small>Contacts and notes</small></button>
+      <button class="quick-card" onclick="navigate('orders')"><span>▤</span><strong>Orders</strong><small>Drafts and statuses</small></button>
+      <button class="quick-card" onclick="navigate('settings')"><span>⚙</span><strong>Settings</strong><small>Backups and colours</small></button>
+    </div>
+
+    <div class="section-head"><h2>Recent orders</h2></div>
+    <div class="list">${recent.length?recent.map(o=>`
+      <button class="list-item" style="width:100%;text-align:left" onclick="viewOrder('${o.id}')">
+        <div><h3>${esc(o.orderNumber)} · ${esc(o.customerName)}</h3><p class="muted">${dateText(o.createdAt)}</p><span class="badge ${statusClass(o.status)}">${esc(o.status)}</span></div>
+        <strong>${money(o.grandTotal)}</strong>
+      </button>`).join(""):`<div class="empty">No recent orders yet.</div>`}</div>
+
+    <button class="new-order-fab" onclick="startOrder()">+ New order</button>`;
 }
 
-async function productsPage(filter=""){
+async function productsPage(filter="",view="active"){
   const items=(await getAll("products")).sort((a,b)=>a.code.localeCompare(b.code));
-  const shown=items.filter(p=>(p.code+" "+p.name+" "+(p.category||"")).toLowerCase().includes(filter.toLowerCase()));
+  const filteredByState=items.filter(p=>view==="all" ? true : view==="archived" ? p.isActive===false : p.isActive!==false);
+  const shown=filteredByState.filter(p=>(p.code+" "+p.name+" "+(p.category||"")).toLowerCase().includes(filter.toLowerCase()));
   main.innerHTML=`
-    <input id="productSearch" class="search" placeholder="Search products" value="${esc(filter)}">
-    <div class="list" style="margin-top:10px">${shown.length?shown.map(p=>`
-      <div class="list-item">
-        <div>
-          <h3>${esc(p.code)} · ${esc(p.name)}</h3>
-          <p>${money(p.price)} <span class="muted">ex VAT</span></p>
-          <div class="colour-tiles">${(p.colours||[]).map(c=>`<span class="colour-tile"><span class="swatch" style="--swatch:${esc(c.hex||"#ccc")}"></span>${esc(c.name)}</span>`).join("")}</div>
+    <div class="toolbar-stack">
+      <input id="productSearch" class="search" placeholder="Search products" value="${esc(filter)}">
+      <div class="filter-chips">
+        <button class="filter-chip ${view==="active"?"selected":""}" data-view="active">Active</button>
+        <button class="filter-chip ${view==="archived"?"selected":""}" data-view="archived">Archived</button>
+        <button class="filter-chip ${view==="all"?"selected":""}" data-view="all">All</button>
+      </div>
+    </div>
+    <div class="product-management-grid">${shown.length?shown.map(p=>`
+      <article class="management-product-card ${p.isActive===false?"archived":""}">
+        ${p.image?`<img src="${p.image}" alt="${esc(p.name)}">`:`<div class="catalogue-placeholder">▦</div>`}
+        <div class="management-card-body">
+          <div class="management-card-head">
+            <div><strong>${esc(p.code)}</strong><h3>${esc(p.name)}</h3></div>
+            ${p.isActive===false?`<span class="badge">Archived</span>`:""}
+          </div>
+          <p class="muted">${esc(p.category||"Uncategorised")}</p>
+          <p class="product-price">${money(p.price)} <small>ex VAT</small></p>
+          <div class="colour-tiles compact">${(p.colours||[]).map(c=>`<span class="colour-tile"><span class="swatch" style="--swatch:${esc(c.hex||"#ccc")}"></span>${esc(c.name)}</span>`).join("")}</div>
+          <div class="actions">
+            <button class="ghost" onclick="showProductForm('${p.id}')">Edit</button>
+            <button class="ghost" onclick="duplicateProduct('${p.id}')">Duplicate</button>
+            ${p.isActive===false
+              ? `<button class="secondary" onclick="setProductActive('${p.id}',true)">Restore</button>`
+              : `<button class="secondary" onclick="setProductActive('${p.id}',false)">Archive</button>`}
+            <button class="danger" onclick="removeProduct('${p.id}')">Delete</button>
+          </div>
         </div>
-        <div class="actions">
-          <button class="ghost" onclick="showProductForm('${p.id}')">Edit</button>
-          <button class="danger" onclick="removeProduct('${p.id}')">Delete</button>
-        </div>
-      </div>`).join(""):`<div class="empty">No products yet. Tap + to add one.</div>`}</div>
+      </article>`).join(""):`<div class="empty">No products found.</div>`}</div>
     <button class="fab" onclick="showProductForm()">+</button>`;
-  document.getElementById("productSearch").oninput=e=>productsPage(e.target.value);
+  document.getElementById("productSearch").oninput=e=>productsPage(e.target.value,view);
+  document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>productsPage(filter,b.dataset.view));
+}
+async function duplicateProduct(id){
+  const p=await getOne("products",id);
+  const copy={...structuredClone(p),id:uid("prd"),code:`${p.code}-COPY`,name:`${p.name} Copy`,isActive:true,updatedAt:new Date().toISOString()};
+  await putOne("products",copy);
+  notify("Product duplicated");
+  productsPage();
+}
+async function setProductActive(id,isActive){
+  const p=await getOne("products",id);
+  p.isActive=isActive;
+  p.updatedAt=new Date().toISOString();
+  await putOne("products",p);
+  notify(isActive?"Product restored":"Product archived");
+  productsPage();
 }
 
 async function showProductForm(id=""){
   const p=id?await getOne("products",id):{id:uid("prd"),code:"",name:"",description:"",category:"",price:"",colours:[],image:""};
   let colours=[...(p.colours||[])];
+  const appSettings=(await getAll("settings"))[0]||{companyColours:[]};
   openDialog(`
     <div class="dialog-head"><h2>${id?"Edit":"Add"} product</h2><button class="close-btn" onclick="closeDialog()">×</button></div>
     <form id="productForm">
@@ -129,6 +194,7 @@ async function showProductForm(id=""){
       <label>Price excluding VAT<input name="price" type="number" min="0" step="0.01" required value="${esc(p.price)}"></label>
       <div>
         <label>Available colours</label>
+        <div id="companyColourChoices" class="colour-tiles"></div>
         <div class="colour-entry">
           <input id="colourName" placeholder="Colour name">
           <input id="colourHex" type="color" value="#777777" style="width:58px;padding:4px">
@@ -138,6 +204,19 @@ async function showProductForm(id=""){
       </div>
       <button class="primary" type="submit">Save product</button>
     </form>`);
+  const renderCompanyChoices=()=>{
+    const box=document.getElementById("companyColourChoices");
+    box.innerHTML=(appSettings.companyColours||[]).map(c=>`
+      <button type="button" class="colour-tile company-choice" data-name="${esc(c.name)}" data-hex="${esc(c.hex)}">
+        <span class="swatch" style="--swatch:${esc(c.hex)}"></span>${esc(c.name)}
+      </button>`).join("");
+    box.querySelectorAll("button").forEach(b=>b.onclick=()=>{
+      if(!colours.some(c=>c.name.toLowerCase()===b.dataset.name.toLowerCase())){
+        colours.push({name:b.dataset.name,hex:b.dataset.hex});
+        renderColours();
+      }
+    });
+  };
   const renderColours=()=>{
     document.getElementById("savedColours").innerHTML=colours.length?colours.map((c,i)=>`
       <button type="button" class="colour-tile" data-i="${i}">
@@ -151,6 +230,7 @@ async function showProductForm(id=""){
     if(name&&!colours.some(c=>c.name.toLowerCase()===name.toLowerCase())) colours.push({name,hex});
     document.getElementById("colourName").value="";renderColours();
   };
+  renderCompanyChoices();
   renderColours();
   let productImage=p.image||"";
   document.getElementById("productImage").onchange=async e=>{
@@ -163,7 +243,7 @@ async function showProductForm(id=""){
   document.getElementById("productForm").onsubmit=async e=>{
     e.preventDefault();
     const d=Object.fromEntries(new FormData(e.target));
-    await putOne("products",{...p,...d,price:Number(d.price),colours,image:productImage,updatedAt:new Date().toISOString()});
+    await putOne("products",{...p,...d,price:Number(d.price),colours,image:productImage,isActive:p.isActive!==false,updatedAt:new Date().toISOString()});
     closeDialog();notify("Product saved");navigate("products");
   };
 }
@@ -173,19 +253,60 @@ async function removeProduct(id){
   }
 }
 
-async function customersPage(filter=""){
+async function customersPage(filter="",view="active"){
   const items=(await getAll("customers")).sort((a,b)=>a.name.localeCompare(b.name));
-  const shown=items.filter(c=>(c.name+" "+(c.contactPerson||"")+" "+(c.phone||"")).toLowerCase().includes(filter.toLowerCase()));
+  const filteredByState=items.filter(c=>view==="all" ? true : view==="archived" ? c.isActive===false : c.isActive!==false);
+  const shown=filteredByState.filter(c=>(c.name+" "+(c.contactPerson||"")+" "+(c.phone||"")+" "+(c.whatsapp||"")).toLowerCase().includes(filter.toLowerCase()));
   main.innerHTML=`
-    <input id="customerSearch" class="search" placeholder="Search customers" value="${esc(filter)}">
-    <div class="list" style="margin-top:10px">${shown.length?shown.map(c=>`
-      <div class="list-item">
-        <div><h3>${esc(c.name)}</h3><p>${esc(c.contactPerson||"No contact person")}</p><p class="muted">${esc(c.phone||"")} ${c.vatNumber?`· VAT ${esc(c.vatNumber)}`:""}</p></div>
-        <div class="actions"><button class="ghost" onclick="showCustomerForm('${c.id}')">Edit</button><button class="danger" onclick="removeCustomer('${c.id}')">Delete</button></div>
-      </div>`).join(""):`<div class="empty">No customers yet. Tap + to add one.</div>`}</div>
+    <div class="toolbar-stack">
+      <input id="customerSearch" class="search" placeholder="Search customers" value="${esc(filter)}">
+      <div class="filter-chips">
+        <button class="filter-chip ${view==="active"?"selected":""}" data-view="active">Active</button>
+        <button class="filter-chip ${view==="archived"?"selected":""}" data-view="archived">Archived</button>
+        <button class="filter-chip ${view==="all"?"selected":""}" data-view="all">All</button>
+      </div>
+    </div>
+    <div class="customer-card-grid">${shown.length?shown.map(c=>`
+      <article class="customer-card ${c.isActive===false?"archived":""}">
+        <div class="customer-avatar">${esc((c.name||"?").charAt(0).toUpperCase())}</div>
+        <div class="customer-card-content">
+          <div class="management-card-head"><h3>${esc(c.name)}</h3>${c.isActive===false?`<span class="badge">Archived</span>`:""}</div>
+          <p><strong>${esc(c.contactPerson||"No contact person")}</strong></p>
+          <p class="muted">${esc(c.phone||"No telephone")}</p>
+          <p class="muted">WhatsApp: ${esc(c.whatsapp||"Not supplied")}</p>
+          <span class="badge">${esc(c.preference||"Delivery")}</span>
+          ${c.notes?`<p class="customer-note">${esc(c.notes)}</p>`:""}
+          <div class="actions">
+            <button class="primary" onclick="startOrderForCustomer('${c.id}')">New order</button>
+            <button class="ghost" onclick="showCustomerForm('${c.id}')">Edit</button>
+            ${c.isActive===false
+              ? `<button class="secondary" onclick="setCustomerActive('${c.id}',true)">Restore</button>`
+              : `<button class="secondary" onclick="setCustomerActive('${c.id}',false)">Archive</button>`}
+            <button class="danger" onclick="removeCustomer('${c.id}')">Delete</button>
+          </div>
+        </div>
+      </article>`).join(""):`<div class="empty">No customers found.</div>`}</div>
     <button class="fab" onclick="showCustomerForm()">+</button>`;
-  document.getElementById("customerSearch").oninput=e=>customersPage(e.target.value);
+  document.getElementById("customerSearch").oninput=e=>customersPage(e.target.value,view);
+  document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>customersPage(filter,b.dataset.view));
 }
+async function startOrderForCustomer(customerId){
+  await startOrder();
+  const select=document.getElementById("orderCustomer");
+  if(select){
+    select.value=customerId;
+    select.dispatchEvent(new Event("change"));
+  }
+}
+async function setCustomerActive(id,isActive){
+  const c=await getOne("customers",id);
+  c.isActive=isActive;
+  c.updatedAt=new Date().toISOString();
+  await putOne("customers",c);
+  notify(isActive?"Customer restored":"Customer archived");
+  customersPage();
+}
+
 async function showCustomerForm(id=""){
   const c=id?await getOne("customers",id):{id:uid("cus"),name:"",vatNumber:"",contactPerson:"",phone:"",whatsapp:"",email:"",address:"",deliveryAddress:"",preference:"Delivery",notes:""};
   openDialog(`
@@ -205,7 +326,7 @@ async function showCustomerForm(id=""){
     </form>`);
   document.getElementById("customerForm").onsubmit=async e=>{
     e.preventDefault();const d=Object.fromEntries(new FormData(e.target));
-    await putOne("customers",{...c,...d,updatedAt:new Date().toISOString()});
+    await putOne("customers",{...c,...d,isActive:c.isActive!==false,updatedAt:new Date().toISOString()});
     closeDialog();notify("Customer saved");navigate("customers");
   };
 }
@@ -227,7 +348,9 @@ async function ordersPage(){
 }
 
 async function startOrder(existingId=""){
-  const [products,customers]=await Promise.all([getAll("products"),getAll("customers")]);
+  const [allProducts,allCustomers]=await Promise.all([getAll("products"),getAll("customers")]);
+  const products=allProducts.filter(p=>p.isActive!==false);
+  const customers=allCustomers.filter(c=>c.isActive!==false);
   if(!products.length){alert("Add at least one product first.");return navigate("products")}
   if(!customers.length){alert("Add at least one customer first.");return navigate("customers")}
   const existing=existingId?await getOne("orders",existingId):null;
@@ -434,8 +557,26 @@ async function removeOrder(id){
 }
 
 async function settingsPage(){
+  const settings=(await getAll("settings"))[0]||{id:"app_settings",companyColours:[
+    {name:"Charcoal",hex:"#4a4a4a"},
+    {name:"White",hex:"#ffffff"},
+    {name:"Sandstone",hex:"#c9b38f"},
+    {name:"Terracotta",hex:"#a75d47"}
+  ]};
   main.innerHTML=`
     <div class="card">
+      <h2>Company colour library</h2>
+      <p class="muted">Create reusable colours for all products.</p>
+      <div class="colour-entry">
+        <input id="globalColourName" placeholder="Colour name">
+        <input id="globalColourHex" type="color" value="#777777" style="width:58px;padding:4px">
+        <button id="addGlobalColour" class="secondary" type="button">Add</button>
+      </div>
+      <div id="globalColours" class="colour-tiles"></div>
+      <button id="saveGlobalColours" class="primary" style="margin-top:10px">Save colour library</button>
+    </div>
+
+    <div class="card" style="margin-top:12px">
       <h2>Backup and restore</h2>
       <p class="muted">Data is currently stored on this phone. Export a backup regularly.</p>
       <div class="actions">
@@ -443,15 +584,38 @@ async function settingsPage(){
         <label class="secondary" style="display:inline-flex;align-items:center;cursor:pointer">Restore backup<input id="restoreInput" type="file" accept=".json" hidden></label>
       </div>
     </div>
+
     <div class="card" style="margin-top:12px">
       <h2>Application</h2>
-      <p><strong>Version:</strong> 1.0 Alpha 3</p>
+      <p><strong>Version:</strong> 1.0 Alpha 4</p>
       <p><strong>Currency:</strong> South African Rand</p>
       <p><strong>VAT:</strong> 15%</p>
       <p class="muted">Phone-first local version. Cloud sync will be added later.</p>
     </div>`;
+
+  let colours=[...(settings.companyColours||[])];
+  const render=()=>{
+    document.getElementById("globalColours").innerHTML=colours.length?colours.map((c,i)=>`
+      <button type="button" class="colour-tile" data-i="${i}">
+        <span class="swatch" style="--swatch:${esc(c.hex)}"></span>${esc(c.name)} ×
+      </button>`).join(""):`<span class="muted">No colours saved.</span>`;
+    document.querySelectorAll("#globalColours button").forEach(b=>b.onclick=()=>{colours.splice(Number(b.dataset.i),1);render();});
+  };
+  document.getElementById("addGlobalColour").onclick=()=>{
+    const name=document.getElementById("globalColourName").value.trim();
+    const hex=document.getElementById("globalColourHex").value;
+    if(name&&!colours.some(c=>c.name.toLowerCase()===name.toLowerCase())) colours.push({name,hex});
+    document.getElementById("globalColourName").value="";
+    render();
+  };
+  document.getElementById("saveGlobalColours").onclick=async()=>{
+    await putOne("settings",{...settings,companyColours:colours,updatedAt:new Date().toISOString()});
+    notify("Colour library saved");
+  };
+  render();
   document.getElementById("restoreInput").onchange=restoreBackup;
 }
+
 async function exportBackup(){
   const data={version:1,exportedAt:new Date().toISOString()};
   for(const s of STORES)data[s]=await getAll(s);
