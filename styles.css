@@ -213,3 +213,17 @@ dialog::backdrop{background:rgba(0,0,0,.48)}
 .visit-detail section{padding-top:10px;border-top:1px solid var(--border);margin-top:10px}
 .visit-detail section h3{margin:0 0 5px}
 @media(max-width:440px){.visit-intelligence-grid{grid-template-columns:1fr}}
+
+.intelligence-summary{margin-bottom:12px}
+.intelligence-card{border-left:4px solid var(--primary);align-items:center}
+.intelligence-card-right{text-align:right;display:grid;gap:2px}
+.prediction-hero{display:grid;gap:5px;padding:18px;margin:12px 0;border-radius:16px;background:var(--surface-soft);border:1px solid var(--border)}
+.prediction-hero>strong{font-size:1.45rem;color:var(--primary)}
+.intelligence-detail section{margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}
+.badge.prediction-overdue{background:#f3dddd;color:#7d3030}
+.badge.prediction-due-soon{background:#fff0cf;color:#79580d}
+.badge.prediction-recent{background:#d9efe2;color:#255c39}
+.badge.prediction-learning{background:#e5e8eb;color:#4f5961}
+.optional-admin-note{margin-top:14px}
+.optional-admin-note p{margin:5px 0 10px}
+@media(max-width:440px){.intelligence-card-right strong{font-size:.82rem}}
