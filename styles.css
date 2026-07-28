@@ -172,3 +172,36 @@ dialog::backdrop{background:rgba(0,0,0,.48)}
 .badge.declined,.badge.expired{background:#f3dddd;color:#7d3030}
 .badge.converted{background:#e4e1f4;color:#493c79}
 @media(max-width:440px){.quote-meta-grid{grid-template-columns:1fr}}
+
+.professional-document{background:#fff;color:#202523;border-radius:18px;padding:24px;box-shadow:var(--shadow);font-family:Arial,sans-serif}
+.document-letterhead{display:flex;justify-content:space-between;gap:20px;border-bottom:3px solid #35584a;padding-bottom:16px}
+.document-brand{display:flex;gap:14px;align-items:flex-start}.document-brand img{width:86px;height:86px;object-fit:contain}
+.document-brand h1{font-size:1.3rem;margin:0 0 5px;color:#35584a}.document-brand p{font-size:.76rem;line-height:1.35;margin:2px 0}
+.document-title-block{text-align:right}.document-title{font-size:1.5rem;font-weight:900;letter-spacing:.1em;color:#35584a}.document-number{font-size:1rem;font-weight:800;margin:6px 0}
+.document-parties{display:grid;grid-template-columns:1.2fr 1fr;gap:18px;margin:20px 0}.document-parties h3{margin:5px 0}.document-parties p{margin:3px 0;font-size:.82rem}
+.document-label{display:block;font-size:.67rem;font-weight:900;letter-spacing:.1em;color:#826b45;margin-bottom:5px}
+.document-meta{display:grid;gap:6px}.document-meta div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #e4e6e4;padding:5px 0;font-size:.8rem}
+.quote-colour-section{margin:15px 0;break-inside:avoid}.quote-colour-heading{background:#35584a;color:#fff;font-weight:900;padding:8px 10px;border-radius:7px 7px 0 0}
+.quote-table{display:grid;grid-template-columns:minmax(0,2.5fr) .45fr .9fr .9fr;gap:8px;padding:8px 10px;border:1px solid #e3e5e3;border-top:0;align-items:center;font-size:.78rem}
+.quote-table>div:not(:first-child){text-align:right}.quote-table span{display:block;color:#646b67;margin-top:2px}.quote-table-head{background:#eff3f0;font-size:.67rem;font-weight:900;text-transform:uppercase}
+.document-summary{display:grid;grid-template-columns:1.5fr 1fr;gap:22px;margin-top:20px;align-items:start}.document-notes p{font-size:.76rem;line-height:1.45}
+.document-totals{border:1px solid #dfe3e0;border-radius:10px;overflow:hidden}.document-totals>div{display:flex;justify-content:space-between;padding:8px 10px;font-size:.8rem;border-bottom:1px solid #e8eae8}.document-totals>div:last-child{border:0}
+.document-grand-total{background:#35584a;color:#fff;font-size:1rem!important;font-weight:900}
+.acceptance-section{margin-top:24px;border-top:1px solid #dfe3e0;padding-top:15px}.acceptance-section p{font-size:.76rem}
+.signature-grid{display:grid;grid-template-columns:1.3fr 1fr .7fr;gap:14px;margin-top:25px}.signature-grid div{height:38px;border-bottom:1px solid #555;display:flex;align-items:flex-end}.signature-grid span{font-size:.65rem;color:#666;padding-bottom:3px}
+.document-footer{text-align:center;border-top:1px solid #dfe3e0;margin-top:22px;padding-top:10px;font-size:.7rem;color:#59615d}
+.linked-document{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;background:var(--surface-soft);border-radius:10px;margin-bottom:10px}.link-button{background:none;border:0;color:var(--primary);font-weight:900;text-decoration:underline;padding:0}
+@media(max-width:600px){
+  .professional-document{padding:14px}.document-letterhead,.document-brand{gap:9px}.document-brand img{width:58px;height:58px}
+  .document-brand h1{font-size:1rem}.document-brand p{font-size:.62rem}.document-title{font-size:1rem}.document-number{font-size:.75rem}
+  .document-parties,.document-summary{grid-template-columns:1fr}.quote-table{grid-template-columns:minmax(0,2fr) .35fr .8fr .8fr;font-size:.67rem;padding:7px 5px}.quote-table-head{font-size:.56rem}
+}
+@media print{
+  @page{size:A4;margin:10mm}
+  body.printing-quotation *{visibility:hidden!important}
+  body.printing-quotation #printArea,body.printing-quotation #printArea *{visibility:visible!important}
+  body.printing-quotation #printArea{position:absolute;left:0;top:0;width:100%;padding:0;box-shadow:none;border-radius:0}
+  body.printing-quotation .topbar,body.printing-quotation .bottom-nav,body.printing-quotation .no-print{display:none!important}
+  .professional-document{box-shadow:none}
+  .quote-colour-section,.document-summary,.acceptance-section{break-inside:avoid}
+}

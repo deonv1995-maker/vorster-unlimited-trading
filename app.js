@@ -726,48 +726,109 @@ async function startQuote(existingId=""){
 }
 
 async function viewQuote(id){
-  const q=await getOne("quotes",id);
+  const [q,settingsRows]=await Promise.all([getOne("quotes",id),getAll("settings")]);
   if(!q)return navigate("quotes");
+  const settings=settingsRows[0]||{};
+  const customer=q.customerSnapshot||{};
   const statuses=["Draft","Sent","Accepted","Declined","Expired","Converted"];
   pageTitle.textContent="Quote details";backBtn.classList.remove("hidden");navState("quotes");
   main.innerHTML=`
-    <div class="card order-doc" id="printArea">
-      <div class="order-doc-head">
-        <div><div class="step-label">Vorster Unlimited Trading</div><h2>${esc(q.quoteNumber)}</h2><span class="badge ${statusClass(q.status)}">${esc(q.status)}</span></div>
-        <img src="vorster-logo.jpg" alt="">
-      </div>
-      <div class="quote-meta-grid">
-        <div><span class="muted">Customer</span><strong>${esc(q.customerName)}</strong></div>
-        <div><span class="muted">Quote date</span><strong>${dateText(q.createdAt)}</strong></div>
-        <div><span class="muted">Valid until</span><strong>${q.validUntil?dateText(q.validUntil):"Not set"}</strong></div>
-        <div><span class="muted">Reference</span><strong>${esc(q.quoteNumber)}</strong></div>
-      </div>
-      <div class="colour-groups">${Object.entries(groupLinesByColour(q.lines)).map(([colour,items])=>`
-        <section class="colour-group">
-          <div class="colour-group-head"><h3>${esc(colour)}</h3><span class="badge">${items.reduce((s,x)=>s+Number(x.qty),0)} items</span></div>
-          <div class="list">${items.map(l=>`
-            <div class="list-item"><div><strong>${esc(l.productCode)} · ${esc(l.productName)}</strong><p class="muted">Qty ${l.qty} × ${money(l.unitPrice)}</p></div><strong>${money(l.qty*l.unitPrice)}</strong></div>`).join("")}</div>
-        </section>`).join("")}</div>
-      <div class="total-box" style="margin-top:12px">
-        <div class="total-row"><span>Subtotal ex VAT</span><strong>${money(q.subtotal)}</strong></div>
-        <div class="total-row"><span>Discount</span><strong>− ${money(q.discount||0)}</strong></div>
-        <div class="total-row"><span>Delivery</span><strong>${money(q.delivery)}</strong></div>
-        <div class="total-row"><span>VAT</span><strong>${money(q.vat)}</strong></div>
-        <div class="total-row grand"><span>Total</span><span>${money(q.grandTotal)}</span></div>
-      </div>
-      ${q.customerNotes?`<p><strong>Customer notes:</strong> ${esc(q.customerNotes)}</p>`:""}
+    <div class="professional-document quotation-document" id="printArea">
+      <header class="document-letterhead">
+        <div class="document-brand">
+          <img src="vorster-logo.jpg" alt="Vorster Unlimited Trading">
+          <div>
+            <h1>${esc(settings.companyName||"Vorster Unlimited Trading")}</h1>
+            <p>${esc(settings.companyAddress||"FARM118, UNIT 426, RIETFONTEIN, MULDERSDRIFT, 1747")}</p>
+            <p>${esc(settings.companyPhone||"072 407 3086")} · ${esc(settings.companyEmail||"sales@v-unlimited.com")}</p>
+            <p>VAT: ${esc(settings.vatNumber||"4810233942")} · Reg: ${esc(settings.registrationNumber||"CC 2005/063515/23")}</p>
+          </div>
+        </div>
+        <div class="document-title-block">
+          <div class="document-title">QUOTATION</div>
+          <div class="document-number">${esc(q.quoteNumber)}</div>
+          <span class="badge ${statusClass(q.status)}">${esc(q.status)}</span>
+        </div>
+      </header>
+
+      <section class="document-parties">
+        <div>
+          <span class="document-label">QUOTED TO</span>
+          <h3>${esc(q.customerName)}</h3>
+          <p>${esc(customer.contactPerson||"")}</p>
+          <p>${esc(customer.address||"")}</p>
+          <p>${esc(customer.phone||customer.whatsapp||"")}</p>
+          <p>${esc(customer.email||"")}</p>
+          ${customer.vat?`<p>VAT: ${esc(customer.vat)}</p>`:""}
+        </div>
+        <div class="document-meta">
+          <div><span>Quote date</span><strong>${dateText(q.createdAt)}</strong></div>
+          <div><span>Valid until</span><strong>${q.validUntil?dateText(q.validUntil):"Not set"}</strong></div>
+          <div><span>Reference</span><strong>${esc(q.quoteNumber)}</strong></div>
+          <div><span>Delivery / Collection</span><strong>${esc(customer.preference||"Delivery")}</strong></div>
+        </div>
+      </section>
+
+      <section class="document-items">
+        ${Object.entries(groupLinesByColour(q.lines)).map(([colour,items])=>`
+          <div class="quote-colour-section">
+            <div class="quote-colour-heading">${esc(colour)}</div>
+            <div class="quote-table quote-table-head">
+              <div>Code & description</div><div>Qty</div><div>Unit ex VAT</div><div>Total ex VAT</div>
+            </div>
+            ${items.map(l=>`
+              <div class="quote-table">
+                <div><strong>${esc(l.productCode)}</strong><span>${esc(l.productName)}</span></div>
+                <div>${l.qty}</div>
+                <div>${money(l.unitPrice)}</div>
+                <div>${money(l.qty*l.unitPrice)}</div>
+              </div>`).join("")}
+          </div>`).join("")}
+      </section>
+
+      <section class="document-summary">
+        <div class="document-notes">
+          ${q.customerNotes?`<div><span class="document-label">NOTES</span><p>${esc(q.customerNotes)}</p></div>`:""}
+          <div>
+            <span class="document-label">TERMS AND CONDITIONS</span>
+            <p>${esc(settings.quoteTerms||"Quotation valid until the date shown. Prices are subject to stock availability. Delivery dates are confirmed once the order is accepted. Goods remain the property of Vorster Unlimited Trading until paid in full.")}</p>
+          </div>
+        </div>
+        <div class="document-totals">
+          <div><span>Subtotal ex VAT</span><strong>${money(q.subtotal)}</strong></div>
+          <div><span>Discount</span><strong>− ${money(q.discount||0)}</strong></div>
+          <div><span>Delivery</span><strong>${money(q.delivery)}</strong></div>
+          <div><span>VAT (${q.vatRate||15}%)</span><strong>${money(q.vat)}</strong></div>
+          <div class="document-grand-total"><span>TOTAL</span><strong>${money(q.grandTotal)}</strong></div>
+        </div>
+      </section>
+
+      <section class="acceptance-section">
+        <span class="document-label">QUOTATION ACCEPTANCE</span>
+        <p>I accept this quotation and authorise Vorster Unlimited Trading to proceed with the order.</p>
+        <div class="signature-grid">
+          <div><span>Customer name</span></div><div><span>Signature</span></div><div><span>Date</span></div>
+        </div>
+      </section>
+
+      <footer class="document-footer">
+        Thank you for the opportunity to quote. Please use ${esc(q.quoteNumber)} as your reference.
+      </footer>
     </div>
-    <div class="card no-print" style="margin-top:12px">
+
+    <div class="card no-print quote-control-panel" style="margin-top:12px">
       ${q.internalNotes?`<p><strong>Internal notes:</strong> ${esc(q.internalNotes)}</p>`:""}
+      ${q.linkedOrderId?`<div class="linked-document"><span>Converted order</span><button class="secondary" onclick="viewOrder('${q.linkedOrderId}')">${esc(q.linkedOrderNumber||"Open order")}</button></div>`:""}
       <label>Status<select id="quoteStatusSelect">${statuses.map(s=>`<option ${s===q.status?"selected":""}>${s}</option>`).join("")}</select></label>
       <div class="actions" style="margin-top:10px">
         ${q.status==="Draft"?`<button class="secondary" onclick="startQuote('${q.id}')">Edit</button>`:""}
-        <button class="primary" onclick="shareQuote('${q.id}')">Share summary</button>
-        <button class="ghost" onclick="window.print()">Print / Save PDF</button>
+        <button class="primary" onclick="printQuote('${q.id}')">Professional PDF</button>
+        <button class="secondary" onclick="shareQuote('${q.id}')">Share summary</button>
+        ${!q.linkedOrderId&&!["Declined","Expired"].includes(q.status)?`<button class="primary" onclick="convertQuoteToOrder('${q.id}')">Convert to order</button>`:""}
         <button class="ghost" onclick="duplicateQuote('${q.id}')">Duplicate</button>
         <button class="danger" onclick="removeQuote('${q.id}')">Delete</button>
       </div>
-      <p class="muted sprint-note">Professional branded PDF and Quote → Order conversion are scheduled for the next quotation sprint.</p>
+      <p class="muted sprint-note">Use Professional PDF, then choose “Save as PDF” in the phone’s print menu. The PDF uses the quotation details saved in Settings.</p>
     </div>`;
   document.getElementById("quoteStatusSelect").onchange=async e=>{
     const next=e.target.value;
@@ -775,6 +836,66 @@ async function viewQuote(id){
       q.status=next;q.updatedAt=new Date().toISOString();await putOne("quotes",q);notify("Quote status updated");viewQuote(id);
     }else e.target.value=q.status;
   };
+}
+
+function printQuote(){
+  document.body.classList.add("printing-quotation");
+  window.print();
+  setTimeout(()=>document.body.classList.remove("printing-quotation"),1000);
+}
+
+async function nextOrderNumber(){
+  const orders=await getAll("orders");
+  const year=new Date().getFullYear();
+  const prefix=`ORD-${year}-`;
+  const highest=orders
+    .map(o=>o.orderNumber||"")
+    .filter(n=>n.startsWith(prefix))
+    .map(n=>Number(n.slice(prefix.length)))
+    .filter(Number.isFinite)
+    .reduce((m,n)=>Math.max(m,n),0);
+  return `${prefix}${String(highest+1).padStart(4,"0")}`;
+}
+
+async function convertQuoteToOrder(id){
+  const q=await getOne("quotes",id);
+  if(!q)return;
+  if(q.linkedOrderId){notify("Quote is already converted");return viewOrder(q.linkedOrderId);}
+  if(!confirm(`Convert ${q.quoteNumber} into a confirmed order?`))return;
+  const order={
+    id:uid("ord"),
+    orderNumber:await nextOrderNumber(),
+    customerId:q.customerId,
+    customerName:q.customerName,
+    customerSnapshot:structuredClone(q.customerSnapshot||{}),
+    status:"Confirmed",
+    lines:structuredClone(q.lines||[]),
+    delivery:Number(q.delivery||0),
+    subtotal:Number(q.subtotal||0)-Number(q.discount||0),
+    vatRate:Number(q.vatRate||15),
+    vat:Number(q.vat||0),
+    grandTotal:Number(q.grandTotal||0),
+    notes:`Converted from quotation ${q.quoteNumber}${q.customerNotes?` — ${q.customerNotes}`:""}`,
+    sourceQuoteId:q.id,
+    sourceQuoteNumber:q.quoteNumber,
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString()
+  };
+  await putOne("orders",order);
+  q.status="Converted";
+  q.linkedOrderId=order.id;
+  q.linkedOrderNumber=order.orderNumber;
+  q.updatedAt=new Date().toISOString();
+  await putOne("quotes",q);
+  await putOne("activities",{
+    id:uid("act"),
+    customerId:q.customerId,
+    type:"Quote Converted",
+    notes:`${q.quoteNumber} converted to ${order.orderNumber}`,
+    createdAt:new Date().toISOString()
+  });
+  notify("Quote converted to confirmed order");
+  viewOrder(order.id);
 }
 
 async function shareQuote(id){
@@ -831,7 +952,7 @@ async function startOrder(existingId=""){
   if(!customers.length){alert("Add at least one customer first.");return navigate("customers")}
   const existing=existingId?await getOne("orders",existingId):null;
   const order=existing?structuredClone(existing):{
-    id:uid("ord"),orderNumber:`SO-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
+    id:uid("ord"),orderNumber:await nextOrderNumber(),
     customerId:"",status:"Draft",lines:[],delivery:0,notes:"",vatRate:15,createdAt:new Date().toISOString()
   };
   let lines=order.lines||[];
@@ -966,7 +1087,7 @@ async function viewOrder(id){
   main.innerHTML=`
     <div class="card order-doc" id="printArea">
       <div class="order-doc-head">
-        <div><div class="step-label">Vorster Unlimited Trading</div><h2>${esc(o.orderNumber)}</h2><span class="badge ${statusClass(o.status)}">${esc(o.status)}</span></div>
+        <div><div class="step-label">Vorster Unlimited Trading</div><h2>${esc(o.orderNumber)}</h2><span class="badge ${statusClass(o.status)}">${esc(o.status)}</span>${o.sourceQuoteId?`<p class="muted">From quotation <button class="link-button no-print" onclick="viewQuote('${o.sourceQuoteId}')">${esc(o.sourceQuoteNumber||"Open quote")}</button></p>`:""}</div>
         <img src="vorster-logo.jpg" alt="">
       </div>
       <p><strong>Customer:</strong> ${esc(o.customerName)}</p>
@@ -1021,7 +1142,7 @@ async function duplicateOrder(id){
   const copy={
     ...structuredClone(original),
     id:uid("ord"),
-    orderNumber:`SO-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
+    orderNumber:await nextOrderNumber(),
     status:"Draft",
     createdAt:new Date().toISOString(),
     updatedAt:new Date().toISOString()
@@ -1203,7 +1324,14 @@ async function settingsPage(){
     {name:"White",hex:"#ffffff"},
     {name:"Sandstone",hex:"#c9b38f"},
     {name:"Terracotta",hex:"#a75d47"}
-  ]};
+  ],
+  companyName:"Vorster Unlimited Trading",
+  companyPhone:"072 407 3086",
+  companyEmail:"sales@v-unlimited.com",
+  companyAddress:"FARM118, UNIT 426, RIETFONTEIN, MULDERSDRIFT, 1747",
+  vatNumber:"4810233942",
+  registrationNumber:"CC 2005/063515/23",
+  quoteTerms:"Quotation valid until the date shown. Prices are subject to stock availability. Delivery dates are confirmed once the order is accepted. Goods remain the property of Vorster Unlimited Trading until paid in full."};
   main.innerHTML=`
     <div class="card">
       <h2>Company colour library</h2>
@@ -1218,6 +1346,21 @@ async function settingsPage(){
     </div>
 
     <div class="card" style="margin-top:12px">
+      <h2>Quotation details</h2>
+      <p class="muted">These details appear on professional quotations.</p>
+      <label>Business name<input id="companyName" value="${esc(settings.companyName||"Vorster Unlimited Trading")}"></label>
+      <label>Telephone<input id="companyPhone" value="${esc(settings.companyPhone||"072 407 3086")}"></label>
+      <label>Email<input id="companyEmail" value="${esc(settings.companyEmail||"sales@v-unlimited.com")}"></label>
+      <label>Business address<textarea id="companyAddress">${esc(settings.companyAddress||"FARM118, UNIT 426, RIETFONTEIN, MULDERSDRIFT, 1747")}</textarea></label>
+      <div class="grid two">
+        <label>VAT number<input id="vatNumber" value="${esc(settings.vatNumber||"4810233942")}"></label>
+        <label>Registration<input id="registrationNumber" value="${esc(settings.registrationNumber||"CC 2005/063515/23")}"></label>
+      </div>
+      <label>Quotation terms<textarea id="quoteTerms">${esc(settings.quoteTerms||"Quotation valid until the date shown. Prices are subject to stock availability. Delivery dates are confirmed once the order is accepted. Goods remain the property of Vorster Unlimited Trading until paid in full.")}</textarea></label>
+      <button id="saveQuoteSettings" class="primary">Save quotation details</button>
+    </div>
+
+    <div class="card" style="margin-top:12px">
       <h2>Backup and restore</h2>
       <p class="muted">Data is currently stored on this phone. Export a backup regularly.</p>
       <div class="actions">
@@ -1228,7 +1371,7 @@ async function settingsPage(){
 
     <div class="card" style="margin-top:12px">
       <h2>Application</h2>
-      <p><strong>Version:</strong> 1.0 Alpha 7.1.1</p>
+      <p><strong>Version:</strong> 1.0 Alpha 7.1.2</p>
       <p><strong>Currency:</strong> South African Rand</p>
       <p><strong>VAT:</strong> 15%</p>
       <p class="muted">Phone-first local version. Cloud sync will be added later.</p>
@@ -1250,8 +1393,23 @@ async function settingsPage(){
     render();
   };
   document.getElementById("saveGlobalColours").onclick=async()=>{
-    await putOne("settings",{...settings,companyColours:colours,updatedAt:new Date().toISOString()});
+    settings.companyColours=colours;
+    settings.updatedAt=new Date().toISOString();
+    await putOne("settings",settings);
     notify("Colour library saved");
+  };
+  document.getElementById("saveQuoteSettings").onclick=async()=>{
+    settings.companyName=document.getElementById("companyName").value.trim();
+    settings.companyPhone=document.getElementById("companyPhone").value.trim();
+    settings.companyEmail=document.getElementById("companyEmail").value.trim();
+    settings.companyAddress=document.getElementById("companyAddress").value.trim();
+    settings.vatNumber=document.getElementById("vatNumber").value.trim();
+    settings.registrationNumber=document.getElementById("registrationNumber").value.trim();
+    settings.quoteTerms=document.getElementById("quoteTerms").value.trim();
+    settings.companyColours=colours;
+    settings.updatedAt=new Date().toISOString();
+    await putOne("settings",settings);
+    notify("Quotation details saved");
   };
   render();
   document.getElementById("restoreInput").onchange=restoreBackup;
