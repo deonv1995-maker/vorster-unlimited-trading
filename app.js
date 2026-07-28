@@ -12,6 +12,13 @@ const money=n=>new Intl.NumberFormat("en-ZA",{style:"currency",currency:"ZAR"}).
 const dateText=v=>new Intl.DateTimeFormat("en-ZA",{dateStyle:"medium"}).format(new Date(v));
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 const statusClass=s=>String(s||"").toLowerCase().replaceAll(" ","-");
+const customerOrdersFor=(orders,customerId)=>orders.filter(o=>o.customerId===customerId && o.status!=="Cancelled");
+const mostFrequent=(values)=>{
+  const counts={};
+  values.filter(Boolean).forEach(v=>counts[v]=(counts[v]||0)+1);
+  return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0]||"—";
+};
+const daysBetween=(a,b)=>Math.round(Math.abs(new Date(b)-new Date(a))/86400000);
 const groupLinesByColour=lines=>{
   const groups={};
   for(const line of (lines||[])){
@@ -43,7 +50,10 @@ document.getElementById("installBtn").onclick=async()=>{
 };
 
 document.querySelectorAll(".bottom-nav button").forEach(b=>b.onclick=()=>navigate(b.dataset.route));
-backBtn.onclick=()=>navigate("orders");
+backBtn.onclick=()=>{
+  if(pageTitle.textContent==="Customer details") navigate("customers");
+  else navigate("orders");
+};
 
 function navState(name){
   document.querySelectorAll(".bottom-nav button").forEach(b=>b.classList.toggle("active",b.dataset.route===name));
@@ -111,6 +121,21 @@ async function dashboard(){
       <button class="quick-card" onclick="navigate('orders')"><span>▤</span><strong>Orders</strong><small>Drafts and statuses</small></button>
       <button class="quick-card" onclick="navigate('settings')"><span>⚙</span><strong>Settings</strong><small>Backups and colours</small></button>
     </div>
+
+    <div class="section-head"><h2>Customers to revisit</h2></div>
+    <div class="list">${(()=>{
+      const due=activeCustomers.map(c=>{
+        const customerOrders=orders.filter(o=>o.customerId===c.id&&o.status!=="Cancelled").sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+        const last=customerOrders[0];
+        const days=last?daysBetween(last.createdAt,new Date()):9999;
+        return{customer:c,last,days};
+      }).sort((a,b)=>b.days-a.days).slice(0,4);
+      return due.length?due.map(x=>`
+        <button class="list-item" style="width:100%;text-align:left" onclick="viewCustomer('${x.customer.id}')">
+          <div><h3>${esc(x.customer.name)}</h3><p class="muted">${x.last?`${x.days} days since last order`:"No recorded orders"}</p></div>
+          <span class="badge">${x.last?dateText(x.last.createdAt):"New"}</span>
+        </button>`).join(""):`<div class="empty">No active customers yet.</div>`;
+    })()}</div>
 
     <div class="section-head"><h2>Recent orders</h2></div>
     <div class="list">${recent.length?recent.map(o=>`
@@ -277,7 +302,8 @@ async function customersPage(filter="",view="active"){
           <span class="badge">${esc(c.preference||"Delivery")}</span>
           ${c.notes?`<p class="customer-note">${esc(c.notes)}</p>`:""}
           <div class="actions">
-            <button class="primary" onclick="startOrderForCustomer('${c.id}')">New order</button>
+            <button class="primary" onclick="viewCustomer('${c.id}')">View</button>
+            <button class="secondary" onclick="startOrderForCustomer('${c.id}')">New order</button>
             <button class="ghost" onclick="showCustomerForm('${c.id}')">Edit</button>
             ${c.isActive===false
               ? `<button class="secondary" onclick="setCustomerActive('${c.id}',true)">Restore</button>`
@@ -305,6 +331,119 @@ async function setCustomerActive(id,isActive){
   await putOne("customers",c);
   notify(isActive?"Customer restored":"Customer archived");
   customersPage();
+}
+
+async function viewCustomer(id){
+  const [c,orders,activities]=await Promise.all([
+    getOne("customers",id),
+    getAll("orders"),
+    getAll("activities")
+  ]);
+  if(!c){alert("Customer not found.");return navigate("customers");}
+  const customerOrders=customerOrdersFor(orders,id).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  const customerActivities=activities.filter(a=>a.customerId===id).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  const totalValue=customerOrders.reduce((s,o)=>s+Number(o.grandTotal||0),0);
+  const averageValue=customerOrders.length?totalValue/customerOrders.length:0;
+  const favouriteProduct=mostFrequent(customerOrders.flatMap(o=>o.lines||[]).map(l=>l.productName));
+  const favouriteColour=mostFrequent(customerOrders.flatMap(o=>o.lines||[]).map(l=>l.colour?.name));
+  const lastOrder=customerOrders[0];
+  const intervals=[];
+  for(let i=0;i<customerOrders.length-1;i++) intervals.push(daysBetween(customerOrders[i].createdAt,customerOrders[i+1].createdAt));
+  const averageInterval=intervals.length?Math.round(intervals.reduce((a,b)=>a+b,0)/intervals.length):null;
+  const nextEstimate=lastOrder&&averageInterval?new Date(new Date(lastOrder.createdAt).getTime()+averageInterval*86400000):null;
+
+  pageTitle.textContent="Customer details";
+  backBtn.classList.remove("hidden");
+  navState("customers");
+  main.innerHTML=`
+    <section class="customer-profile card">
+      <div class="customer-profile-head">
+        <div class="customer-avatar large">${esc((c.name||"?").charAt(0).toUpperCase())}</div>
+        <div>
+          <div class="step-label">Customer account</div>
+          <h2>${esc(c.name)}</h2>
+          <p>${esc(c.contactPerson||"No contact person")}</p>
+          ${c.isActive===false?`<span class="badge">Archived</span>`:`<span class="badge confirmed">Active</span>`}
+        </div>
+      </div>
+      <div class="contact-grid">
+        <div><span class="muted">Telephone</span><strong>${esc(c.phone||"—")}</strong></div>
+        <div><span class="muted">WhatsApp</span><strong>${esc(c.whatsapp||"—")}</strong></div>
+        <div><span class="muted">Email</span><strong>${esc(c.email||"—")}</strong></div>
+        <div><span class="muted">Preference</span><strong>${esc(c.preference||"Delivery")}</strong></div>
+      </div>
+      <div class="actions">
+        <button class="primary" onclick="startOrderForCustomer('${c.id}')">New order</button>
+        <button class="secondary" onclick="showCustomerForm('${c.id}')">Edit customer</button>
+        ${c.whatsapp?`<button class="ghost" onclick="openWhatsApp('${esc(c.whatsapp)}')">WhatsApp</button>`:""}
+      </div>
+    </section>
+
+    <div class="grid two customer-metrics">
+      <div class="card stat"><span class="muted">Orders</span><strong>${customerOrders.length}</strong></div>
+      <div class="card stat"><span class="muted">Average order</span><strong>${money(averageValue)}</strong></div>
+      <div class="card stat"><span class="muted">Favourite product</span><strong class="small-stat">${esc(favouriteProduct)}</strong></div>
+      <div class="card stat"><span class="muted">Favourite colour</span><strong class="small-stat">${esc(favouriteColour)}</strong></div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <h3>Ordering pattern</h3>
+      <div class="pattern-grid">
+        <div><span class="muted">Last order</span><strong>${lastOrder?dateText(lastOrder.createdAt):"No orders yet"}</strong></div>
+        <div><span class="muted">Average interval</span><strong>${averageInterval?`${averageInterval} days`:"Not enough history"}</strong></div>
+        <div><span class="muted">Estimated next order</span><strong>${nextEstimate?dateText(nextEstimate):"Not available"}</strong></div>
+        <div><span class="muted">Lifetime value</span><strong>${money(totalValue)}</strong></div>
+      </div>
+    </div>
+
+    <div class="section-head"><h2>Activity</h2><button class="secondary" onclick="showActivityForm('${c.id}')">Add activity</button></div>
+    <div class="list">${customerActivities.length?customerActivities.slice(0,10).map(a=>`
+      <div class="list-item activity-item">
+        <div><h3>${esc(a.type)}</h3><p>${esc(a.notes||"No notes")}</p><p class="muted">${dateText(a.createdAt)}</p></div>
+      </div>`).join(""):`<div class="empty">No customer activities recorded yet.</div>`}</div>
+
+    <div class="section-head"><h2>Order history</h2></div>
+    <div class="list">${customerOrders.length?customerOrders.map(o=>`
+      <button class="list-item" style="width:100%;text-align:left" onclick="viewOrder('${o.id}')">
+        <div><h3>${esc(o.orderNumber)}</h3><p class="muted">${dateText(o.createdAt)}</p><span class="badge ${statusClass(o.status)}">${esc(o.status)}</span></div>
+        <strong>${money(o.grandTotal)}</strong>
+      </button>`).join(""):`<div class="empty">No orders for this customer yet.</div>`}</div>`;
+}
+
+function openWhatsApp(number){
+  const cleaned=String(number||"").replace(/\D/g,"");
+  if(!cleaned)return;
+  const international=cleaned.startsWith("0")?`27${cleaned.slice(1)}`:cleaned;
+  window.open(`https://wa.me/${international}`,"_blank");
+}
+
+async function showActivityForm(customerId){
+  openDialog(`
+    <div class="dialog-head"><h2>Add customer activity</h2><button class="close-btn" onclick="closeDialog()">×</button></div>
+    <form id="activityForm">
+      <label>Activity type<select name="type">
+        <option>Visit</option>
+        <option>Phone Call</option>
+        <option>WhatsApp</option>
+        <option>Quote Sent</option>
+        <option>Order</option>
+        <option>No Order</option>
+        <option>Unavailable</option>
+        <option>Follow-up</option>
+        <option>Display Checked</option>
+        <option>Samples Delivered</option>
+      </select></label>
+      <label>Notes<textarea name="notes" placeholder="What happened?"></textarea></label>
+      <button class="primary" type="submit">Save activity</button>
+    </form>`);
+  document.getElementById("activityForm").onsubmit=async e=>{
+    e.preventDefault();
+    const d=Object.fromEntries(new FormData(e.target));
+    await putOne("activities",{id:uid("act"),customerId,...d,createdAt:new Date().toISOString()});
+    closeDialog();
+    notify("Activity saved");
+    viewCustomer(customerId);
+  };
 }
 
 async function showCustomerForm(id=""){
@@ -587,7 +726,7 @@ async function settingsPage(){
 
     <div class="card" style="margin-top:12px">
       <h2>Application</h2>
-      <p><strong>Version:</strong> 1.0 Alpha 4</p>
+      <p><strong>Version:</strong> 1.0 Alpha 5</p>
       <p><strong>Currency:</strong> South African Rand</p>
       <p><strong>VAT:</strong> 15%</p>
       <p class="muted">Phone-first local version. Cloud sync will be added later.</p>

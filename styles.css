@@ -145,3 +145,15 @@ dialog::backdrop{background:rgba(0,0,0,.48)}
   .product-management-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
   .customer-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+.customer-profile-head{display:flex;gap:14px;align-items:center}
+.customer-avatar.large{width:70px;height:70px;font-size:1.8rem}
+.customer-profile h2{margin:3px 0}.customer-profile p{margin:0 0 7px}
+.contact-grid,.pattern-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:15px 0}
+.contact-grid div,.pattern-grid div{display:grid;gap:3px;padding:10px;background:var(--surface-soft);border-radius:12px}
+.customer-metrics{margin-top:12px}
+.small-stat{font-size:1rem!important;line-height:1.2}
+.activity-item{border-left:4px solid var(--accent)}
+@media(max-width:430px){
+  .contact-grid,.pattern-grid{grid-template-columns:1fr}
+}

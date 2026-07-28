@@ -1,23 +1,25 @@
-# Vorster Unlimited Trading v1 — Alpha 4
+# Vorster Unlimited Trading v1 — Alpha 5
 
-Product, customer and dashboard management phase.
+Sales Rep Mode and customer intelligence phase.
 
-## New in Alpha 4
+## New in Alpha 5
 
-- Premium dashboard redesign
-- Always-visible New Order button
-- Product catalogue cards with images
-- Active, Archived and All product filters
-- Edit, duplicate, archive, restore and delete products
-- Reusable company colour library in Settings
-- Add saved company colours to products with one tap
-- Improved customer cards
-- Customer notes, telephone, WhatsApp and delivery preference shown
-- New Order button directly from a customer
-- Archive and restore customers
-- Archived products and customers are excluded from new orders
-- Existing Alpha 3 data remains compatible
+- Full customer details screen
+- Customer order history
+- Total number of orders
+- Average order value
+- Lifetime customer value
+- Favourite product
+- Favourite colour
+- Last order date
+- Average ordering interval
+- Estimated next order date
+- Customer activity log
+- Activity types for visits, calls, WhatsApp, quotes, follow-ups and samples
+- One-tap WhatsApp from customer details
+- Dashboard list of customers to revisit
+- Existing Alpha 4 data remains compatible
 
-## Important
+## Test
 
-Test archive and restore with sample products and customers before entering the full database.
+Create several test orders for one customer, then open that customer to review the calculated buying patterns.
