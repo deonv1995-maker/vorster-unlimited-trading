@@ -205,3 +205,11 @@ dialog::backdrop{background:rgba(0,0,0,.48)}
   .professional-document{box-shadow:none}
   .quote-colour-section,.document-summary,.acceptance-section{break-inside:avoid}
 }
+
+.visit-list-item{border-left:4px solid var(--primary)}
+.visit-form textarea{min-height:88px}
+.visit-intelligence-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}
+.visit-intelligence-grid>div{display:grid;gap:4px;padding:11px;border-radius:12px;background:var(--surface-soft)}
+.visit-detail section{padding-top:10px;border-top:1px solid var(--border);margin-top:10px}
+.visit-detail section h3{margin:0 0 5px}
+@media(max-width:440px){.visit-intelligence-grid{grid-template-columns:1fr}}

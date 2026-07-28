@@ -53,6 +53,7 @@ document.querySelectorAll(".bottom-nav button").forEach(b=>b.onclick=()=>navigat
 backBtn.onclick=()=>{
   if(pageTitle.textContent==="Customer details") navigate("customers");
   else if(["Quote details","New quote","Edit quote"].includes(pageTitle.textContent)) navigate("quotes");
+  else if(["Sales Visits","Visit details","Record visit","Edit visit"].includes(pageTitle.textContent)) navigate("visits");
   else if(pageTitle.textContent==="Production job") navigate("production");
   else if(pageTitle.textContent==="Delivery details") navigate("deliveries");
   else navigate("orders");
@@ -73,11 +74,12 @@ dialog.addEventListener("click",e=>{if(e.target===dialog)closeDialog()});
 
 async function navigate(name){
   route=name;navState(name);backBtn.classList.add("hidden");
-  const titles={dashboard:"Dashboard",products:"Products",customers:"Customers",quotes:"Quotes",orders:"Orders",production:"Production",deliveries:"Deliveries",settings:"Settings"};
+  const titles={dashboard:"Dashboard",products:"Products",customers:"Customers",visits:"Sales Visits",quotes:"Quotes",orders:"Orders",production:"Production",deliveries:"Deliveries",settings:"Settings"};
   pageTitle.textContent=titles[name]||"Vorster Unlimited Trading";
   if(name==="dashboard")await dashboard();
   if(name==="products")await productsPage();
   if(name==="customers")await customersPage();
+  if(name==="visits")await visitsPage();
   if(name==="quotes")await quotesPage();
   if(name==="orders")await ordersPage();
   if(name==="production")await productionPage();
@@ -86,12 +88,13 @@ async function navigate(name){
 }
 
 async function dashboard(){
-  const [products,customers,quotes,orders,productionJobs,deliveries]=await Promise.all([
-    getAll("products"),getAll("customers"),getAll("quotes"),getAll("orders"),getAll("productionJobs"),getAll("deliveries")
+  const [products,customers,visits,quotes,orders,productionJobs,deliveries]=await Promise.all([
+    getAll("products"),getAll("customers"),getAll("visits"),getAll("quotes"),getAll("orders"),getAll("productionJobs"),getAll("deliveries")
   ]);
   const activeProducts=products.filter(p=>p.isActive!==false);
   const activeCustomers=customers.filter(c=>c.isActive!==false);
   const drafts=orders.filter(o=>o.status==="Draft").length;
+  const upcomingVisits=visits.filter(v=>v.nextVisitDate&&new Date(v.nextVisitDate)>=new Date(new Date().toDateString())).length;
   const openQuotes=quotes.filter(q=>["Draft","Sent","Accepted"].includes(q.status)).length;
   const confirmed=orders.filter(o=>o.status==="Confirmed").length;
   const production=orders.filter(o=>o.status==="In Production").length;
@@ -114,6 +117,7 @@ async function dashboard(){
     <div class="grid two dashboard-stats">
       <div class="card stat"><span class="muted">Active products</span><strong>${activeProducts.length}</strong></div>
       <div class="card stat"><span class="muted">Active customers</span><strong>${activeCustomers.length}</strong></div>
+      <div class="card stat"><span class="muted">Upcoming visits</span><strong>${upcomingVisits}</strong></div>
       <div class="card stat"><span class="muted">Open quotes</span><strong>${openQuotes}</strong></div>
       <div class="card stat"><span class="muted">Draft orders</span><strong>${drafts}</strong></div>
       <div class="card stat"><span class="muted">Confirmed</span><strong>${confirmed}</strong></div>
@@ -130,6 +134,7 @@ async function dashboard(){
     <div class="quick-grid premium">
       <button class="quick-card" onclick="navigate('products')"><span>▦</span><strong>Products</strong><small>Catalogue and colours</small></button>
       <button class="quick-card" onclick="navigate('customers')"><span>◉</span><strong>Customers</strong><small>Contacts and notes</small></button>
+      <button class="quick-card" onclick="navigate('visits')"><span>⌖</span><strong>Sales visits</strong><small>${upcomingVisits} upcoming</small></button>
       <button class="quick-card" onclick="navigate('quotes')"><span>▧</span><strong>Quotes</strong><small>${openQuotes} open quotes</small></button>
       <button class="quick-card" onclick="navigate('orders')"><span>▤</span><strong>Orders</strong><small>Drafts and statuses</small></button>
       <button class="quick-card" onclick="navigate('production')"><span>🏭</span><strong>Production</strong><small>${openProduction} open jobs</small></button>
@@ -320,6 +325,7 @@ async function customersPage(filter="",view="active"){
             <button class="primary" onclick="viewCustomer('${c.id}')">View</button>
             <button class="secondary" onclick="startOrderForCustomer('${c.id}')">New order</button>
             <button class="ghost" onclick="startQuoteForCustomer('${c.id}')">New quote</button>
+            <button class="ghost" onclick="startVisitForCustomer('${c.id}')">Record visit</button>
             <button class="ghost" onclick="showCustomerForm('${c.id}')">Edit</button>
             ${c.isActive===false
               ? `<button class="secondary" onclick="setCustomerActive('${c.id}',true)">Restore</button>`
@@ -350,16 +356,19 @@ async function setCustomerActive(id,isActive){
 }
 
 async function viewCustomer(id){
-  const [c,orders,quotes,activities]=await Promise.all([
+  const [c,orders,quotes,visits,activities]=await Promise.all([
     getOne("customers",id),
     getAll("orders"),
     getAll("quotes"),
+    getAll("visits"),
     getAll("activities")
   ]);
   if(!c){alert("Customer not found.");return navigate("customers");}
   const customerOrders=customerOrdersFor(orders,id).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
   const customerActivities=activities.filter(a=>a.customerId===id).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
   const customerQuotes=quotes.filter(q=>q.customerId===id).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  const customerVisits=visits.filter(v=>v.customerId===id).sort((a,b)=>new Date(b.visitDate||b.createdAt)-new Date(a.visitDate||a.createdAt));
+  const lastVisit=customerVisits[0];
   const outstandingQuotes=customerQuotes.filter(q=>["Draft","Sent","Accepted"].includes(q.status));
   const totalValue=customerOrders.reduce((s,o)=>s+Number(o.grandTotal||0),0);
   const averageValue=customerOrders.length?totalValue/customerOrders.length:0;
@@ -394,6 +403,7 @@ async function viewCustomer(id){
       <div class="actions">
         <button class="primary" onclick="startOrderForCustomer('${c.id}')">New order</button>
         <button class="secondary" onclick="startQuoteForCustomer('${c.id}')">New quote</button>
+        <button class="secondary" onclick="startVisitForCustomer('${c.id}')">Record visit</button>
         <button class="secondary" onclick="showCustomerForm('${c.id}')">Edit customer</button>
         ${c.whatsapp?`<button class="ghost" onclick="openWhatsApp('${esc(c.whatsapp)}')">WhatsApp</button>`:""}
       </div>
@@ -403,6 +413,7 @@ async function viewCustomer(id){
       <div class="card stat"><span class="muted">Orders</span><strong>${customerOrders.length}</strong></div>
       <div class="card stat"><span class="muted">Average order</span><strong>${money(averageValue)}</strong></div>
       <div class="card stat"><span class="muted">Open quotes</span><strong>${outstandingQuotes.length}</strong></div>
+      <div class="card stat"><span class="muted">Last visit</span><strong>${lastVisit?dateText(lastVisit.visitDate||lastVisit.createdAt):"Never"}</strong></div>
       <div class="card stat"><span class="muted">Favourite product</span><strong class="small-stat">${esc(favouriteProduct)}</strong></div>
       <div class="card stat"><span class="muted">Favourite colour</span><strong class="small-stat">${esc(favouriteColour)}</strong></div>
     </div>
@@ -509,6 +520,76 @@ async function nextQuoteNumber(){
     .reduce((m,n)=>Math.max(m,n),0);
   return `${prefix}${String(highest+1).padStart(4,"0")}`;
 }
+
+
+async function visitsPage(filter="",outcome="All"){
+  const [visits,customers]=await Promise.all([getAll("visits"),getAll("customers")]);
+  const sorted=visits.sort((a,b)=>new Date(b.visitDate||b.createdAt)-new Date(a.visitDate||a.createdAt));
+  const shown=sorted.filter(v=>{
+    const text=`${v.customerName} ${v.personSpokenTo||""} ${v.outcome||""} ${v.notes||""}`.toLowerCase();
+    return text.includes(filter.toLowerCase())&&(outcome==="All"||v.outcome===outcome);
+  });
+  const outcomes=["All","Order placed","Quote requested","Follow-up required","No order","Customer unavailable","Display work","Samples left"];
+  main.innerHTML=`
+    <div class="section-head"><div><h2>Sales visits</h2><p class="muted">${visits.length} recorded visits</p></div><button class="primary" onclick="startVisit()">Record visit</button></div>
+    <input id="visitSearch" class="search" placeholder="Search customer, outcome or notes" value="${esc(filter)}">
+    <div id="visitFilters" class="filter-chips" style="margin-top:9px">${outcomes.map(o=>`<button class="filter-chip ${o===outcome?"selected":""}" data-outcome="${esc(o)}">${esc(o)}</button>`).join("")}</div>
+    <div class="list" style="margin-top:10px">${shown.length?shown.map(v=>`
+      <button class="list-item visit-list-item" style="width:100%;text-align:left" onclick="viewVisit('${v.id}')">
+        <div><h3>${esc(v.customerName)}</h3><p class="muted">${dateText(v.visitDate||v.createdAt)}${v.personSpokenTo?` · ${esc(v.personSpokenTo)}`:""}</p><span class="badge">${esc(v.outcome||"Visit")}</span></div>
+        <div style="text-align:right">${v.nextVisitDate?`<strong>${dateText(v.nextVisitDate)}</strong><small class="muted" style="display:block">Next visit</small>`:""}</div>
+      </button>`).join(""):`<div class="empty">No visits found.</div>`}</div>`;
+  document.getElementById("visitSearch").oninput=e=>visitsPage(e.target.value,outcome);
+  document.querySelectorAll("#visitFilters button").forEach(b=>b.onclick=()=>visitsPage(filter,b.dataset.outcome));
+}
+
+async function startVisitForCustomer(customerId){ await startVisit(customerId); }
+
+async function startVisit(customerId="",existingId=""){
+  const [customers,existing]=await Promise.all([getAll("customers"),existingId?getOne("visits",existingId):Promise.resolve(null)]);
+  const activeCustomers=customers.filter(c=>c.isActive!==false);
+  if(!activeCustomers.length){alert("Add a customer first.");return navigate("customers")}
+  const visit=existing||{id:uid("vis"),customerId:customerId||"",visitDate:new Date().toISOString().slice(0,16),personSpokenTo:"",outcome:"Follow-up required",productsDiscussed:"",samplesLeft:"",displayWork:"",notes:"",nextVisitDate:"",createdAt:new Date().toISOString()};
+  pageTitle.textContent=existing?"Edit visit":"Record visit";backBtn.classList.remove("hidden");navState("visits");
+  main.innerHTML=`<div class="card visit-form">
+    <div class="section-head"><div><h2>${existing?"Edit sales visit":"Record sales visit"}</h2><p class="muted">Capture the result while the visit is still fresh.</p></div></div>
+    <label>Customer<select id="visitCustomer"><option value="">Choose customer</option>${activeCustomers.map(c=>`<option value="${c.id}" ${visit.customerId===c.id?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label>
+    <label>Visit date and time<input id="visitDate" type="datetime-local" value="${esc((visit.visitDate||"").slice(0,16))}"></label>
+    <label>Person spoken to<input id="personSpokenTo" value="${esc(visit.personSpokenTo||"")}" placeholder="Buyer, owner or staff member"></label>
+    <label>Visit outcome<select id="visitOutcome">${["Order placed","Quote requested","Follow-up required","No order","Customer unavailable","Display work","Samples left"].map(o=>`<option ${visit.outcome===o?"selected":""}>${o}</option>`).join("")}</select></label>
+    <label>Products discussed<textarea id="productsDiscussed" placeholder="Products, ranges, colours or prices discussed">${esc(visit.productsDiscussed||"")}</textarea></label>
+    <label>Samples left<textarea id="samplesLeft" placeholder="Sample name, quantity and colour">${esc(visit.samplesLeft||"")}</textarea></label>
+    <label>Display work<textarea id="displayWork" placeholder="Display cleaned, rearranged, photographed or repaired">${esc(visit.displayWork||"")}</textarea></label>
+    <label>Visit notes<textarea id="visitNotes" placeholder="Important discussion points and customer feedback">${esc(visit.notes||"")}</textarea></label>
+    <label>Next visit date<input id="nextVisitDate" type="date" value="${esc(visit.nextVisitDate||"")}"></label>
+    <div class="save-actions"><button class="secondary" onclick="navigate('visits')">Cancel</button><button id="saveVisit" class="primary">Save visit</button></div>
+  </div>`;
+  document.getElementById("saveVisit").onclick=async()=>{
+    const selectedId=document.getElementById("visitCustomer").value;if(!selectedId){alert("Select a customer.");return}
+    const customer=activeCustomers.find(c=>c.id===selectedId);
+    const saved={...visit,customerId:selectedId,customerName:customer.name,visitDate:document.getElementById("visitDate").value||new Date().toISOString(),personSpokenTo:document.getElementById("personSpokenTo").value.trim(),outcome:document.getElementById("visitOutcome").value,productsDiscussed:document.getElementById("productsDiscussed").value.trim(),samplesLeft:document.getElementById("samplesLeft").value.trim(),displayWork:document.getElementById("displayWork").value.trim(),notes:document.getElementById("visitNotes").value.trim(),nextVisitDate:document.getElementById("nextVisitDate").value,updatedAt:new Date().toISOString()};
+    await putOne("visits",saved);await putOne("activities",{id:uid("act"),customerId:selectedId,type:"Sales Visit",notes:`${saved.outcome}${saved.notes?` — ${saved.notes}`:""}`,createdAt:new Date().toISOString()});notify("Sales visit saved");viewVisit(saved.id);
+  };
+}
+
+async function viewVisit(id){
+  const [visit,orders,quotes]=await Promise.all([getOne("visits",id),getAll("orders"),getAll("quotes")]);if(!visit)return navigate("visits");
+  const customerOrders=orders.filter(o=>o.customerId===visit.customerId).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  const customerQuotes=quotes.filter(q=>q.customerId===visit.customerId).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  const lastOrder=customerOrders[0],openQuotes=customerQuotes.filter(q=>["Draft","Sent","Accepted"].includes(q.status));
+  pageTitle.textContent="Visit details";backBtn.classList.remove("hidden");navState("visits");
+  main.innerHTML=`<div class="card visit-detail">
+    <div class="section-head"><div><h2>${esc(visit.customerName)}</h2><p class="muted">${dateText(visit.visitDate||visit.createdAt)}</p></div><span class="badge">${esc(visit.outcome||"Visit")}</span></div>
+    <div class="visit-intelligence-grid"><div><span class="muted">Person spoken to</span><strong>${esc(visit.personSpokenTo||"Not recorded")}</strong></div><div><span class="muted">Last order</span><strong>${lastOrder?`${esc(lastOrder.orderNumber)} · ${money(lastOrder.grandTotal)}`:"No orders"}</strong></div><div><span class="muted">Open quotes</span><strong>${openQuotes.length}</strong></div><div><span class="muted">Next visit</span><strong>${visit.nextVisitDate?dateText(visit.nextVisitDate):"Not scheduled"}</strong></div></div>
+    ${visit.productsDiscussed?`<section><h3>Products discussed</h3><p>${esc(visit.productsDiscussed)}</p></section>`:""}
+    ${visit.samplesLeft?`<section><h3>Samples left</h3><p>${esc(visit.samplesLeft)}</p></section>`:""}
+    ${visit.displayWork?`<section><h3>Display work</h3><p>${esc(visit.displayWork)}</p></section>`:""}
+    ${visit.notes?`<section><h3>Visit notes</h3><p>${esc(visit.notes)}</p></section>`:""}
+    <div class="actions no-print" style="margin-top:12px"><button class="primary" onclick="startOrderForCustomer('${visit.customerId}')">New order</button><button class="secondary" onclick="startQuoteForCustomer('${visit.customerId}')">New quote</button><button class="secondary" onclick="startVisit('${visit.customerId}','${visit.id}')">Edit visit</button><button class="ghost" onclick="viewCustomer('${visit.customerId}')">Open customer</button><button class="danger" onclick="removeVisit('${visit.id}')">Delete</button></div>
+  </div>`;
+}
+
+async function removeVisit(id){if(confirm("Delete this visit record permanently?")){await deleteOne("visits",id);notify("Visit deleted");navigate("visits");}}
 
 async function quotesPage(filter="",status="All"){
   const quotes=(await getAll("quotes")).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
@@ -1371,7 +1452,7 @@ async function settingsPage(){
 
     <div class="card" style="margin-top:12px">
       <h2>Application</h2>
-      <p><strong>Version:</strong> 1.0 Alpha 7.1.2</p>
+      <p><strong>Version:</strong> 1.0 Alpha 7.2.1</p>
       <p><strong>Currency:</strong> South African Rand</p>
       <p><strong>VAT:</strong> 15%</p>
       <p class="muted">Phone-first local version. Cloud sync will be added later.</p>
