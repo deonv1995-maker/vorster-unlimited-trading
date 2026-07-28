@@ -52,6 +52,7 @@ document.getElementById("installBtn").onclick=async()=>{
 document.querySelectorAll(".bottom-nav button").forEach(b=>b.onclick=()=>navigate(b.dataset.route));
 backBtn.onclick=()=>{
   if(pageTitle.textContent==="Customer details") navigate("customers");
+  else if(["Quote details","New quote","Edit quote"].includes(pageTitle.textContent)) navigate("quotes");
   else if(pageTitle.textContent==="Production job") navigate("production");
   else if(pageTitle.textContent==="Delivery details") navigate("deliveries");
   else navigate("orders");
@@ -72,11 +73,12 @@ dialog.addEventListener("click",e=>{if(e.target===dialog)closeDialog()});
 
 async function navigate(name){
   route=name;navState(name);backBtn.classList.add("hidden");
-  const titles={dashboard:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",production:"Production",deliveries:"Deliveries",settings:"Settings"};
+  const titles={dashboard:"Dashboard",products:"Products",customers:"Customers",quotes:"Quotes",orders:"Orders",production:"Production",deliveries:"Deliveries",settings:"Settings"};
   pageTitle.textContent=titles[name]||"Vorster Unlimited Trading";
   if(name==="dashboard")await dashboard();
   if(name==="products")await productsPage();
   if(name==="customers")await customersPage();
+  if(name==="quotes")await quotesPage();
   if(name==="orders")await ordersPage();
   if(name==="production")await productionPage();
   if(name==="deliveries")await deliveriesPage();
@@ -84,12 +86,13 @@ async function navigate(name){
 }
 
 async function dashboard(){
-  const [products,customers,orders,productionJobs,deliveries]=await Promise.all([
-    getAll("products"),getAll("customers"),getAll("orders"),getAll("productionJobs"),getAll("deliveries")
+  const [products,customers,quotes,orders,productionJobs,deliveries]=await Promise.all([
+    getAll("products"),getAll("customers"),getAll("quotes"),getAll("orders"),getAll("productionJobs"),getAll("deliveries")
   ]);
   const activeProducts=products.filter(p=>p.isActive!==false);
   const activeCustomers=customers.filter(c=>c.isActive!==false);
   const drafts=orders.filter(o=>o.status==="Draft").length;
+  const openQuotes=quotes.filter(q=>["Draft","Sent","Accepted"].includes(q.status)).length;
   const confirmed=orders.filter(o=>o.status==="Confirmed").length;
   const production=orders.filter(o=>o.status==="In Production").length;
   const ready=orders.filter(o=>o.status==="Ready").length;
@@ -111,6 +114,7 @@ async function dashboard(){
     <div class="grid two dashboard-stats">
       <div class="card stat"><span class="muted">Active products</span><strong>${activeProducts.length}</strong></div>
       <div class="card stat"><span class="muted">Active customers</span><strong>${activeCustomers.length}</strong></div>
+      <div class="card stat"><span class="muted">Open quotes</span><strong>${openQuotes}</strong></div>
       <div class="card stat"><span class="muted">Draft orders</span><strong>${drafts}</strong></div>
       <div class="card stat"><span class="muted">Confirmed</span><strong>${confirmed}</strong></div>
       <div class="card stat"><span class="muted">In production</span><strong>${production}</strong></div>
@@ -126,6 +130,7 @@ async function dashboard(){
     <div class="quick-grid premium">
       <button class="quick-card" onclick="navigate('products')"><span>▦</span><strong>Products</strong><small>Catalogue and colours</small></button>
       <button class="quick-card" onclick="navigate('customers')"><span>◉</span><strong>Customers</strong><small>Contacts and notes</small></button>
+      <button class="quick-card" onclick="navigate('quotes')"><span>▧</span><strong>Quotes</strong><small>${openQuotes} open quotes</small></button>
       <button class="quick-card" onclick="navigate('orders')"><span>▤</span><strong>Orders</strong><small>Drafts and statuses</small></button>
       <button class="quick-card" onclick="navigate('production')"><span>🏭</span><strong>Production</strong><small>${openProduction} open jobs</small></button>
       <button class="quick-card" onclick="navigate('deliveries')"><span>🚚</span><strong>Deliveries</strong><small>${scheduledDeliveries} scheduled</small></button>
@@ -314,6 +319,7 @@ async function customersPage(filter="",view="active"){
           <div class="actions">
             <button class="primary" onclick="viewCustomer('${c.id}')">View</button>
             <button class="secondary" onclick="startOrderForCustomer('${c.id}')">New order</button>
+            <button class="ghost" onclick="startQuoteForCustomer('${c.id}')">New quote</button>
             <button class="ghost" onclick="showCustomerForm('${c.id}')">Edit</button>
             ${c.isActive===false
               ? `<button class="secondary" onclick="setCustomerActive('${c.id}',true)">Restore</button>`
@@ -344,14 +350,17 @@ async function setCustomerActive(id,isActive){
 }
 
 async function viewCustomer(id){
-  const [c,orders,activities]=await Promise.all([
+  const [c,orders,quotes,activities]=await Promise.all([
     getOne("customers",id),
     getAll("orders"),
+    getAll("quotes"),
     getAll("activities")
   ]);
   if(!c){alert("Customer not found.");return navigate("customers");}
   const customerOrders=customerOrdersFor(orders,id).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
   const customerActivities=activities.filter(a=>a.customerId===id).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  const customerQuotes=quotes.filter(q=>q.customerId===id).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  const outstandingQuotes=customerQuotes.filter(q=>["Draft","Sent","Accepted"].includes(q.status));
   const totalValue=customerOrders.reduce((s,o)=>s+Number(o.grandTotal||0),0);
   const averageValue=customerOrders.length?totalValue/customerOrders.length:0;
   const favouriteProduct=mostFrequent(customerOrders.flatMap(o=>o.lines||[]).map(l=>l.productName));
@@ -384,6 +393,7 @@ async function viewCustomer(id){
       </div>
       <div class="actions">
         <button class="primary" onclick="startOrderForCustomer('${c.id}')">New order</button>
+        <button class="secondary" onclick="startQuoteForCustomer('${c.id}')">New quote</button>
         <button class="secondary" onclick="showCustomerForm('${c.id}')">Edit customer</button>
         ${c.whatsapp?`<button class="ghost" onclick="openWhatsApp('${esc(c.whatsapp)}')">WhatsApp</button>`:""}
       </div>
@@ -392,6 +402,7 @@ async function viewCustomer(id){
     <div class="grid two customer-metrics">
       <div class="card stat"><span class="muted">Orders</span><strong>${customerOrders.length}</strong></div>
       <div class="card stat"><span class="muted">Average order</span><strong>${money(averageValue)}</strong></div>
+      <div class="card stat"><span class="muted">Open quotes</span><strong>${outstandingQuotes.length}</strong></div>
       <div class="card stat"><span class="muted">Favourite product</span><strong class="small-stat">${esc(favouriteProduct)}</strong></div>
       <div class="card stat"><span class="muted">Favourite colour</span><strong class="small-stat">${esc(favouriteColour)}</strong></div>
     </div>
@@ -482,6 +493,322 @@ async function showCustomerForm(id=""){
 async function removeCustomer(id){
   if(confirm("Delete this customer? Existing orders will keep their saved customer details.")){
     await deleteOne("customers",id);notify("Customer deleted");customersPage();
+  }
+}
+
+
+async function nextQuoteNumber(){
+  const quotes=await getAll("quotes");
+  const year=new Date().getFullYear();
+  const prefix=`QUO-${year}-`;
+  const highest=quotes
+    .map(q=>q.quoteNumber||"")
+    .filter(n=>n.startsWith(prefix))
+    .map(n=>Number(n.slice(prefix.length)))
+    .filter(Number.isFinite)
+    .reduce((m,n)=>Math.max(m,n),0);
+  return `${prefix}${String(highest+1).padStart(4,"0")}`;
+}
+
+async function quotesPage(filter="",status="All"){
+  const quotes=(await getAll("quotes")).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  const shown=quotes.filter(q=>{
+    const text=`${q.quoteNumber} ${q.customerName} ${q.status}`.toLowerCase();
+    return text.includes(filter.toLowerCase())&&(status==="All"||q.status===status);
+  });
+  const totalOpen=quotes.filter(q=>["Draft","Sent","Accepted"].includes(q.status)).reduce((s,q)=>s+Number(q.grandTotal||0),0);
+  main.innerHTML=`
+    <div class="section-head"><div><h2>Quotations</h2><p class="muted">${money(totalOpen)} open quote value</p></div><button class="primary" onclick="startQuote()">New quote</button></div>
+    <input id="quoteSearch" class="search" placeholder="Search quote or customer" value="${esc(filter)}">
+    <div id="quoteFilters" class="filter-chips" style="margin-top:9px">
+      ${["All","Draft","Sent","Accepted","Declined","Expired","Converted"].map(s=>`<button class="filter-chip ${s===status?"selected":""}" data-status="${s}">${s}</button>`).join("")}
+    </div>
+    <div class="list" style="margin-top:10px">${shown.length?shown.map(q=>`
+      <button class="list-item quote-list-item" style="width:100%;text-align:left" onclick="viewQuote('${q.id}')">
+        <div>
+          <h3>${esc(q.quoteNumber)} · ${esc(q.customerName)}</h3>
+          <p class="muted">${dateText(q.createdAt)} · Valid until ${q.validUntil?dateText(q.validUntil):"not set"}</p>
+          <span class="badge ${statusClass(q.status)}">${esc(q.status)}</span>
+        </div>
+        <strong>${money(q.grandTotal)}</strong>
+      </button>`).join(""):`<div class="empty">No quotations found.</div>`}</div>`;
+  document.getElementById("quoteSearch").oninput=e=>quotesPage(e.target.value,status);
+  document.querySelectorAll("#quoteFilters button").forEach(b=>b.onclick=()=>quotesPage(filter,b.dataset.status));
+}
+
+async function startQuoteForCustomer(customerId){
+  await startQuote();
+  const select=document.getElementById("quoteCustomer");
+  if(select){
+    select.value=customerId;
+    select.dispatchEvent(new Event("change"));
+  }
+}
+
+async function startQuote(existingId=""){
+  const [allProducts,allCustomers]=await Promise.all([getAll("products"),getAll("customers")]);
+  const products=allProducts.filter(p=>p.isActive!==false);
+  const customers=allCustomers.filter(c=>c.isActive!==false);
+  if(!products.length){alert("Add at least one product first.");return navigate("products")}
+  if(!customers.length){alert("Add at least one customer first.");return navigate("customers")}
+  const existing=existingId?await getOne("quotes",existingId):null;
+  const quote=existing?structuredClone(existing):{
+    id:uid("quo"),
+    quoteNumber:await nextQuoteNumber(),
+    customerId:"",
+    status:"Draft",
+    lines:[],
+    delivery:0,
+    discountType:"Percent",
+    discountValue:0,
+    internalNotes:"",
+    customerNotes:"",
+    vatRate:15,
+    validUntil:new Date(Date.now()+30*86400000).toISOString().slice(0,10),
+    createdAt:new Date().toISOString()
+  };
+  let lines=quote.lines||[];
+  let selectedProduct=null,selectedColour=null,selectedQty=1;
+  pageTitle.textContent=existing?"Edit quote":"New quote";
+  backBtn.classList.remove("hidden");
+  navState("quotes");
+  main.innerHTML=`
+    <div class="order-shell">
+      <div class="document-banner">
+        <div><div class="step-label">Quotation</div><h2>${esc(quote.quoteNumber)}</h2></div>
+        <span class="badge ${statusClass(quote.status)}">${esc(quote.status)}</span>
+      </div>
+      <div>
+        <div class="step-label">Step 1</div>
+        <label>Select customer<select id="quoteCustomer"><option value="">Choose customer</option>${customers.map(c=>`<option value="${c.id}" ${quote.customerId===c.id?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label>
+        <div id="quoteCustomerSummary" class="customer-summary hidden"></div>
+        <label>Valid until<input id="validUntil" type="date" value="${esc(quote.validUntil||"")}"></label>
+      </div>
+      <div>
+        <div class="step-label">Step 2</div>
+        <label>Choose products</label>
+        <input id="quoteCatalogueSearch" class="search" placeholder="Search by code or product name">
+        <div id="quoteCategoryFilters" class="filter-chips"></div>
+        <div id="quoteCatalogue" class="product-grid" style="margin-top:10px"></div>
+      </div>
+      <div id="quotePicker" class="picker-panel hidden"></div>
+      <div>
+        <div class="step-label">Step 3</div>
+        <div class="section-head"><h2>Review quote</h2><span id="quoteBasketCount" class="badge"></span></div>
+        <div id="quoteBasket" class="basket"></div>
+      </div>
+      <div class="grid two">
+        <label>Delivery charge<input id="quoteDelivery" type="number" min="0" step="0.01" value="${Number(quote.delivery||0)}"></label>
+        <label>Discount type<select id="discountType"><option ${quote.discountType==="Percent"?"selected":""}>Percent</option><option ${quote.discountType==="Amount"?"selected":""}>Amount</option></select></label>
+      </div>
+      <label>Discount value<input id="discountValue" type="number" min="0" step="0.01" value="${Number(quote.discountValue||0)}"></label>
+      <label>Customer notes<textarea id="quoteCustomerNotes" placeholder="Shown to the customer">${esc(quote.customerNotes||"")}</textarea></label>
+      <label>Internal notes<textarea id="quoteInternalNotes" placeholder="Only visible inside the app">${esc(quote.internalNotes||"")}</textarea></label>
+      <div id="quoteTotals" class="total-box"></div>
+      <div class="save-actions"><button id="saveQuoteDraft" class="secondary">Save draft</button><button id="saveQuoteSent" class="primary">Save as sent</button></div>
+    </div>`;
+
+  const catalogue=document.getElementById("quoteCatalogue");
+  const picker=document.getElementById("quotePicker");
+  const basket=document.getElementById("quoteBasket");
+  let activeCategory="All";
+  const categories=["All",...Array.from(new Set(products.map(p=>p.category).filter(Boolean))).sort()];
+
+  function renderCustomerSummary(){
+    const id=document.getElementById("quoteCustomer").value;
+    const box=document.getElementById("quoteCustomerSummary");
+    const c=customers.find(x=>x.id===id);
+    if(!c){box.classList.add("hidden");box.innerHTML="";return;}
+    box.classList.remove("hidden");
+    box.innerHTML=`<strong>${esc(c.name)}</strong><span>${esc(c.contactPerson||"No contact person")}</span><span>${esc(c.phone||c.whatsapp||"No phone number")}</span><span>${esc(c.email||"No email")}</span>`;
+  }
+  function renderCategoryFilters(){
+    document.getElementById("quoteCategoryFilters").innerHTML=categories.map(c=>`<button type="button" class="filter-chip ${c===activeCategory?"selected":""}" data-category="${esc(c)}">${esc(c)}</button>`).join("");
+    document.querySelectorAll("#quoteCategoryFilters .filter-chip").forEach(b=>b.onclick=()=>{
+      activeCategory=b.dataset.category;renderCategoryFilters();renderCatalogue(document.getElementById("quoteCatalogueSearch").value);
+    });
+  }
+  function renderCatalogue(filter=""){
+    const shown=products.filter(p=>(activeCategory==="All"||p.category===activeCategory)&&(p.code+" "+p.name+" "+(p.category||"")).toLowerCase().includes(filter.toLowerCase()));
+    catalogue.innerHTML=shown.map(p=>`
+      <button class="product-card" data-id="${p.id}">
+        ${p.image?`<img src="${p.image}" alt="${esc(p.name)}">`:`<div class="catalogue-placeholder">▦</div>`}
+        <div><strong>${esc(p.code)}</strong><div>${esc(p.name)}</div></div>
+        <small>${money(p.price)} ex VAT</small>
+      </button>`).join("");
+    catalogue.querySelectorAll("button").forEach(b=>b.onclick=()=>openPicker(b.dataset.id));
+  }
+  function openPicker(id){
+    selectedProduct=products.find(p=>p.id===id);selectedQty=1;
+    selectedColour=(selectedProduct.colours||[])[0]||{name:"Standard",hex:"#bbbbbb"};
+    picker.classList.remove("hidden");
+    picker.innerHTML=`
+      <div class="dialog-head"><div><strong>${esc(selectedProduct.code)}</strong><div>${esc(selectedProduct.name)}</div></div><button id="closeQuotePicker" class="close-btn">×</button></div>
+      <label>Choose colour</label>
+      <div class="colour-tiles">${((selectedProduct.colours||[]).length?selectedProduct.colours:[{name:"Standard",hex:"#bbbbbb"}]).map((c,i)=>`
+        <button class="colour-tile ${i===0?"selected":""}" data-name="${esc(c.name)}" data-hex="${esc(c.hex)}"><span class="swatch" style="--swatch:${esc(c.hex)}"></span>${esc(c.name)}</button>`).join("")}</div>
+      <div class="qty-row"><button id="quoteMinusQty">−</button><strong id="quoteQtyValue">1</strong><button id="quotePlusQty">+</button></div>
+      <button id="addQuoteLine" class="primary">Add to quote</button>`;
+    picker.querySelectorAll(".colour-tile").forEach(b=>b.onclick=()=>{
+      selectedColour={name:b.dataset.name,hex:b.dataset.hex};
+      picker.querySelectorAll(".colour-tile").forEach(x=>x.classList.remove("selected"));b.classList.add("selected");
+    });
+    document.getElementById("quoteMinusQty").onclick=()=>{selectedQty=Math.max(1,selectedQty-1);document.getElementById("quoteQtyValue").textContent=selectedQty};
+    document.getElementById("quotePlusQty").onclick=()=>{selectedQty++;document.getElementById("quoteQtyValue").textContent=selectedQty};
+    document.getElementById("closeQuotePicker").onclick=()=>picker.classList.add("hidden");
+    document.getElementById("addQuoteLine").onclick=()=>{
+      const same=lines.find(l=>l.productId===selectedProduct.id&&l.colour.name===selectedColour.name);
+      if(same)same.qty+=selectedQty;
+      else lines.push({productId:selectedProduct.id,productCode:selectedProduct.code,productName:selectedProduct.name,colour:selectedColour,qty:selectedQty,unitPrice:Number(selectedProduct.price)});
+      picker.classList.add("hidden");renderBasket();notify("Added to quote");
+    };
+  }
+  function calculate(){
+    const subtotal=lines.reduce((s,l)=>s+Number(l.qty)*Number(l.unitPrice),0);
+    const delivery=Number(document.getElementById("quoteDelivery").value||0);
+    const type=document.getElementById("discountType").value;
+    const value=Number(document.getElementById("discountValue").value||0);
+    const discount=type==="Percent"?subtotal*Math.min(value,100)/100:Math.min(value,subtotal);
+    const taxable=Math.max(0,subtotal-discount+delivery);
+    const vat=taxable*(Number(quote.vatRate||15)/100);
+    return{subtotal,delivery,discount,taxable,vat,grandTotal:taxable+vat};
+  }
+  function renderBasket(){
+    document.getElementById("quoteBasketCount").textContent=`${lines.reduce((s,l)=>s+Number(l.qty),0)} items`;
+    basket.innerHTML=lines.length?lines.map((l,i)=>`
+      <div class="basket-line">
+        <div><strong>${esc(l.productCode)} · ${esc(l.productName)}</strong><div class="muted"><span class="swatch" style="display:inline-block;vertical-align:middle;--swatch:${esc(l.colour.hex)}"></span> ${esc(l.colour.name)}</div></div>
+        <div class="basket-controls"><button data-a="minus" data-i="${i}">−</button><strong>${l.qty}</strong><button data-a="plus" data-i="${i}">+</button><button class="danger" data-a="remove" data-i="${i}">×</button></div>
+        <strong class="basket-price">${money(l.qty*l.unitPrice)}</strong>
+      </div>`).join(""):`<div class="empty">No products added yet.</div>`;
+    basket.querySelectorAll("button").forEach(b=>b.onclick=()=>{
+      const i=Number(b.dataset.i),a=b.dataset.a;
+      if(a==="plus")lines[i].qty++;
+      if(a==="minus")lines[i].qty=Math.max(1,lines[i].qty-1);
+      if(a==="remove")lines.splice(i,1);
+      renderBasket();
+    });
+    const t=calculate();
+    document.getElementById("quoteTotals").innerHTML=`
+      <div class="total-row"><span>Subtotal ex VAT</span><strong>${money(t.subtotal)}</strong></div>
+      <div class="total-row"><span>Discount</span><strong>− ${money(t.discount)}</strong></div>
+      <div class="total-row"><span>Delivery</span><strong>${money(t.delivery)}</strong></div>
+      <div class="total-row"><span>VAT (${quote.vatRate}%)</span><strong>${money(t.vat)}</strong></div>
+      <div class="total-row grand"><span>Total</span><span>${money(t.grandTotal)}</span></div>`;
+  }
+  document.getElementById("quoteCatalogueSearch").oninput=e=>renderCatalogue(e.target.value);
+  document.getElementById("quoteCustomer").onchange=renderCustomerSummary;
+  ["quoteDelivery","discountValue"].forEach(id=>document.getElementById(id).oninput=renderBasket);
+  document.getElementById("discountType").onchange=renderBasket;
+
+  async function saveQuote(status){
+    const customerId=document.getElementById("quoteCustomer").value;
+    if(!customerId){alert("Select a customer.");return}
+    if(!lines.length){alert("Add at least one product.");return}
+    const customer=customers.find(c=>c.id===customerId),t=calculate();
+    const saved={
+      ...quote,status,customerId,customerName:customer.name,customerSnapshot:customer,lines,
+      validUntil:document.getElementById("validUntil").value,
+      delivery:t.delivery,discountType:document.getElementById("discountType").value,
+      discountValue:Number(document.getElementById("discountValue").value||0),
+      discount:t.discount,subtotal:t.subtotal,vat:t.vat,grandTotal:t.grandTotal,
+      customerNotes:document.getElementById("quoteCustomerNotes").value,
+      internalNotes:document.getElementById("quoteInternalNotes").value,
+      updatedAt:new Date().toISOString()
+    };
+    await putOne("quotes",saved);
+    notify(status==="Sent"?"Quote saved as sent":"Quote draft saved");
+    viewQuote(saved.id);
+  }
+  document.getElementById("saveQuoteDraft").onclick=()=>saveQuote("Draft");
+  document.getElementById("saveQuoteSent").onclick=()=>saveQuote("Sent");
+  renderCategoryFilters();renderCatalogue();renderBasket();renderCustomerSummary();
+}
+
+async function viewQuote(id){
+  const q=await getOne("quotes",id);
+  if(!q)return navigate("quotes");
+  const statuses=["Draft","Sent","Accepted","Declined","Expired","Converted"];
+  pageTitle.textContent="Quote details";backBtn.classList.remove("hidden");navState("quotes");
+  main.innerHTML=`
+    <div class="card order-doc" id="printArea">
+      <div class="order-doc-head">
+        <div><div class="step-label">Vorster Unlimited Trading</div><h2>${esc(q.quoteNumber)}</h2><span class="badge ${statusClass(q.status)}">${esc(q.status)}</span></div>
+        <img src="vorster-logo.jpg" alt="">
+      </div>
+      <div class="quote-meta-grid">
+        <div><span class="muted">Customer</span><strong>${esc(q.customerName)}</strong></div>
+        <div><span class="muted">Quote date</span><strong>${dateText(q.createdAt)}</strong></div>
+        <div><span class="muted">Valid until</span><strong>${q.validUntil?dateText(q.validUntil):"Not set"}</strong></div>
+        <div><span class="muted">Reference</span><strong>${esc(q.quoteNumber)}</strong></div>
+      </div>
+      <div class="colour-groups">${Object.entries(groupLinesByColour(q.lines)).map(([colour,items])=>`
+        <section class="colour-group">
+          <div class="colour-group-head"><h3>${esc(colour)}</h3><span class="badge">${items.reduce((s,x)=>s+Number(x.qty),0)} items</span></div>
+          <div class="list">${items.map(l=>`
+            <div class="list-item"><div><strong>${esc(l.productCode)} · ${esc(l.productName)}</strong><p class="muted">Qty ${l.qty} × ${money(l.unitPrice)}</p></div><strong>${money(l.qty*l.unitPrice)}</strong></div>`).join("")}</div>
+        </section>`).join("")}</div>
+      <div class="total-box" style="margin-top:12px">
+        <div class="total-row"><span>Subtotal ex VAT</span><strong>${money(q.subtotal)}</strong></div>
+        <div class="total-row"><span>Discount</span><strong>− ${money(q.discount||0)}</strong></div>
+        <div class="total-row"><span>Delivery</span><strong>${money(q.delivery)}</strong></div>
+        <div class="total-row"><span>VAT</span><strong>${money(q.vat)}</strong></div>
+        <div class="total-row grand"><span>Total</span><span>${money(q.grandTotal)}</span></div>
+      </div>
+      ${q.customerNotes?`<p><strong>Customer notes:</strong> ${esc(q.customerNotes)}</p>`:""}
+    </div>
+    <div class="card no-print" style="margin-top:12px">
+      ${q.internalNotes?`<p><strong>Internal notes:</strong> ${esc(q.internalNotes)}</p>`:""}
+      <label>Status<select id="quoteStatusSelect">${statuses.map(s=>`<option ${s===q.status?"selected":""}>${s}</option>`).join("")}</select></label>
+      <div class="actions" style="margin-top:10px">
+        ${q.status==="Draft"?`<button class="secondary" onclick="startQuote('${q.id}')">Edit</button>`:""}
+        <button class="primary" onclick="shareQuote('${q.id}')">Share summary</button>
+        <button class="ghost" onclick="window.print()">Print / Save PDF</button>
+        <button class="ghost" onclick="duplicateQuote('${q.id}')">Duplicate</button>
+        <button class="danger" onclick="removeQuote('${q.id}')">Delete</button>
+      </div>
+      <p class="muted sprint-note">Professional branded PDF and Quote → Order conversion are scheduled for the next quotation sprint.</p>
+    </div>`;
+  document.getElementById("quoteStatusSelect").onchange=async e=>{
+    const next=e.target.value;
+    if(confirm(`Change quote status from ${q.status} to ${next}?`)){
+      q.status=next;q.updatedAt=new Date().toISOString();await putOne("quotes",q);notify("Quote status updated");viewQuote(id);
+    }else e.target.value=q.status;
+  };
+}
+
+async function shareQuote(id){
+  const q=await getOne("quotes",id);
+  const grouped=Object.entries(groupLinesByColour(q.lines)).map(([colour,items])=>{
+    const lines=items.map(l=>`${l.productCode} ${l.productName} | Qty ${l.qty} | ${money(l.qty*l.unitPrice)}`).join("\n");
+    return `${colour.toUpperCase()}\n${lines}`;
+  }).join("\n\n");
+  const text=`Vorster Unlimited Trading\nQuotation ${q.quoteNumber}\nCustomer: ${q.customerName}\nValid until: ${q.validUntil?dateText(q.validUntil):"Not set"}\n\n${grouped}\n\nSubtotal ex VAT: ${money(q.subtotal)}\nDiscount: ${money(q.discount||0)}\nDelivery: ${money(q.delivery)}\nVAT: ${money(q.vat)}\nTOTAL: ${money(q.grandTotal)}\n\n072 407 3086 | sales@v-unlimited.com`;
+  try{
+    if(navigator.share)await navigator.share({title:`Quotation ${q.quoteNumber}`,text});
+    else{await navigator.clipboard.writeText(text);notify("Quote copied")}
+  }catch(err){if(err.name!=="AbortError")alert("Sharing failed. Use Print / Save PDF.")}
+}
+
+async function duplicateQuote(id){
+  const original=await getOne("quotes",id);
+  const copy={
+    ...structuredClone(original),
+    id:uid("quo"),
+    quoteNumber:await nextQuoteNumber(),
+    status:"Draft",
+    linkedOrderId:"",
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString()
+  };
+  await putOne("quotes",copy);
+  notify("Quote duplicated as draft");
+  viewQuote(copy.id);
+}
+
+async function removeQuote(id){
+  if(confirm("Delete this quotation permanently?")){
+    await deleteOne("quotes",id);notify("Quotation deleted");navigate("quotes");
   }
 }
 
@@ -901,7 +1228,7 @@ async function settingsPage(){
 
     <div class="card" style="margin-top:12px">
       <h2>Application</h2>
-      <p><strong>Version:</strong> 1.0 Alpha 6</p>
+      <p><strong>Version:</strong> 1.0 Alpha 7.1.1</p>
       <p><strong>Currency:</strong> South African Rand</p>
       <p><strong>VAT:</strong> 15%</p>
       <p class="muted">Phone-first local version. Cloud sync will be added later.</p>

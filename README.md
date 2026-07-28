@@ -1,27 +1,39 @@
-# Vorster Unlimited Trading v1 — Alpha 6
+# Vorster Unlimited Trading v1 — Alpha 7.1.1
 
-Production and delivery operations phase.
+Quotes Foundation sprint.
 
-## New in Alpha 6
+## New in this sprint
 
-- Create production jobs from confirmed orders
-- Production jobs grouped by colour
-- Pending, In Progress, Completed and Cancelled job statuses
-- Completing a production job automatically marks its order Ready
-- Schedule deliveries from Ready orders
-- Select delivery date, vehicle and driver
-- Scheduled, Loaded, Out for Delivery, Delivered and Cancelled delivery statuses
-- Marking a delivery Delivered automatically updates the order
-- Production and delivery dashboards
-- Operations counts on the main dashboard
-- Existing Alpha 5 data remains compatible
+- Dedicated Quotes module
+- Automatic quote numbering: QUO-YYYY-0001
+- Create and edit quote drafts
+- Product catalogue ordering workflow reused for quotes
+- Product colour and quantity selection
+- Delivery charge
+- Percentage or fixed-amount discounts
+- Valid-until date
+- Customer-facing and internal notes
+- Draft and Sent save actions
+- Quote search and status filters
+- Quote statuses: Draft, Sent, Accepted, Declined, Expired and Converted
+- Quote detail screen
+- Shareable quote summary
+- Print / Save PDF using the browser
+- Duplicate and delete quotes
+- Open quote count on customer profiles
+- Open quote value on the Quotes page
+- Existing Alpha 6 data remains compatible
 
 ## Test flow
 
-1. Confirm a sample order.
-2. Open it and create a production job.
-3. Mark the job In Progress, then Completed.
-4. Confirm the order becomes Ready.
-5. Schedule a delivery.
-6. Mark it Delivered.
-7. Confirm the order becomes Delivered.
+1. Add at least one customer and product.
+2. Open Quotes and create a new quote.
+3. Add products in different colours.
+4. Add delivery and a discount.
+5. Save as Draft.
+6. Edit the draft and save it as Sent.
+7. Change its status to Accepted.
+8. Duplicate it and confirm the copy receives a new quote number.
+9. Test Share summary and Print / Save PDF.
+
+The fully branded quotation PDF and Quote to Order conversion come in the next quotation sprint.

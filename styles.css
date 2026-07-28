@@ -161,3 +161,14 @@ dialog::backdrop{background:rgba(0,0,0,.48)}
 .badge.pending{background:#f5ead2;color:#795c1f}
 .badge.in-progress,.badge.loaded,.badge.out-for-delivery{background:#dbe7f5;color:#294e79}
 .badge.scheduled{background:#eee3f5;color:#5d3579}
+
+.document-banner{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px;border-radius:16px;background:var(--surface-soft);border:1px solid var(--border)}
+.document-banner h2{margin:3px 0}
+.quote-meta-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}
+.quote-meta-grid>div{display:grid;gap:3px;padding:10px;border-radius:12px;background:var(--surface-soft)}
+.quote-list-item{border-left:4px solid var(--accent)}
+.sprint-note{margin-top:12px;padding:10px;background:var(--surface-soft);border-radius:10px}
+.badge.accepted{background:#d9efe2;color:#255c39}
+.badge.declined,.badge.expired{background:#f3dddd;color:#7d3030}
+.badge.converted{background:#e4e1f4;color:#493c79}
+@media(max-width:440px){.quote-meta-grid{grid-template-columns:1fr}}
