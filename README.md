@@ -1,31 +1,39 @@
-# Vorster Unlimited Trading v1 — Alpha 7.3.2
+# Vorster Unlimited Trading v1 — Alpha 7.3.3
 
-Mobile layout and dark-mode update.
+Category-first product catalogue and compact product tiles.
 
 ## New in this sprint
 
-- Fixed the six-button bottom navigation so it stays on one row
-- Added extra scroll clearance beneath all pages
-- Product action buttons now use a clear two-column layout
-- Floating Add and New Order buttons sit above the navigation
-- Floating buttons hide while scrolling down and return while scrolling up
-- Product search and filters stay visible while scrolling
-- Added a complete dark mode
-- Added a quick theme button in the top bar
-- Added Light Mode and Dark Mode choices under Settings
-- Theme choice is remembered on the phone
-- Paint colour swatches keep their original colours
-- Printed quotations and order documents remain white
-- Existing customers, products, orders, quotes and predictions remain compatible
+- Product categories now appear as their own clickable tiles
+- Categories are created automatically from the Category or Range saved on each product
+- Each category tile shows:
+  - Category name
+  - Number of products
+  - Starting price
+  - A representative product image where available
+- Tapping a category opens only the products in that category
+- Added an All Categories button and working back navigation
+- Search still works across product codes, names and categories
+- Added two product display choices:
+  - Large management tiles
+  - Compact three-column tiles
+- Compact tiles show only:
+  - Product picture
+  - Product code
+  - Ex-VAT price
+- Tapping a compact tile opens the product for editing
+- The selected tile size is remembered on the phone
+- Archived and All filters still work
+- Dark mode remains supported
+- Existing product and business data remain compatible
 
 ## Test flow
 
-1. Open Products and scroll to the bottom of a long product card.
-2. Confirm Edit, Duplicate, Archive and Delete can all be reached.
-3. Confirm Home, Products, Customers, Predict, Quotes and Orders remain on one navigation row.
-4. Scroll down and confirm the floating button moves out of the way.
-5. Scroll upward and confirm it returns.
-6. Tap the moon icon in the top bar.
-7. Check Products, Customers, Quotes, Orders and the Dashboard in dark mode.
-8. Open Settings > Appearance and switch between Light and Dark.
-9. Close and reopen the app and confirm the selected theme remains active.
+1. Open Products.
+2. Confirm products are grouped into clickable category tiles.
+3. Open a category.
+4. Switch to compact view and confirm three products appear per row on a normal phone.
+5. Tap a compact product tile and confirm the product edit screen opens.
+6. Switch back to large view and confirm all management buttons remain available.
+7. Use Search to find a product from any category.
+8. Close and reopen the app and confirm the selected tile size is remembered.

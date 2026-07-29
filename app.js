@@ -140,7 +140,8 @@ window.addEventListener("scroll",()=>{
   lastScrollY=current;
 },{passive:true});
 backBtn.onclick=()=>{
-  if(pageTitle.textContent==="Customer details") navigate("customers");
+  if(pageTitle.textContent.startsWith("Products ·")){pageTitle.textContent="Products";backBtn.classList.add("hidden");productsPage();}
+  else if(pageTitle.textContent==="Customer details") navigate("customers");
   else if(["Quote details","New quote","Edit quote"].includes(pageTitle.textContent)) navigate("quotes");
   else if(["Order Intelligence","Order intelligence","Visit details","Record visit","Edit visit"].includes(pageTitle.textContent)) navigate("visits");
   else if(pageTitle.textContent==="Production job") navigate("production");
@@ -343,44 +344,134 @@ async function dashboard(){
     <button class="new-order-fab" onclick="startOrder()">+ New order</button>`;
 }
 
-async function productsPage(filter="",view="active"){
+async function productsPage(filter="",view="active",category=""){
   const items=(await getAll("products")).sort((a,b)=>a.code.localeCompare(b.code));
+  const displayMode=localStorage.getItem("vu-product-display")||"large";
   const filteredByState=items.filter(p=>view==="all" ? true : view==="archived" ? p.isActive===false : p.isActive!==false);
-  const shown=filteredByState.filter(p=>(p.code+" "+p.name+" "+(p.category||"")).toLowerCase().includes(filter.toLowerCase()));
+  const query=filter.trim().toLowerCase();
+  const matching=filteredByState.filter(p=>(p.code+" "+p.name+" "+(p.category||"Uncategorised")).toLowerCase().includes(query));
+  const normaliseCategory=p=>(p.category||"Uncategorised").trim()||"Uncategorised";
+  const categories=[...new Set(filteredByState.map(normaliseCategory))].sort((a,b)=>a.localeCompare(b));
+  const searching=Boolean(query);
+  const selectedCategory=category||"";
+  const shown=matching.filter(p=>!selectedCategory||normaliseCategory(p)===selectedCategory);
+
+  const categoryCards=categories.map(name=>{
+    const categoryProducts=filteredByState.filter(p=>normaliseCategory(p)===name);
+    const imageProduct=categoryProducts.find(p=>p.image);
+    const priceValues=categoryProducts.map(p=>Number(p.price||0)).filter(Number.isFinite);
+    const fromPrice=priceValues.length?Math.min(...priceValues):0;
+    return `<button class="category-tile" data-category="${esc(name)}">
+      <div class="category-tile-image">
+        ${imageProduct?`<img src="${imageProduct.image}" alt="${esc(name)} category">`:`<span>▦</span>`}
+      </div>
+      <div class="category-tile-body">
+        <strong>${esc(name)}</strong>
+        <span>${categoryProducts.length} product${categoryProducts.length===1?"":"s"}</span>
+        ${priceValues.length?`<small>From ${money(fromPrice)} ex VAT</small>`:""}
+      </div>
+      <span class="category-arrow">›</span>
+    </button>`;
+  }).join("");
+
+  const largeCards=shown.map(p=>`
+    <article class="management-product-card ${p.isActive===false?"archived":""}">
+      ${p.image?`<img src="${p.image}" alt="${esc(p.name)}">`:`<div class="catalogue-placeholder">▦</div>`}
+      <div class="management-card-body">
+        <div class="management-card-head">
+          <div><strong>${esc(p.code)}</strong><h3>${esc(p.name)}</h3></div>
+          ${p.isActive===false?`<span class="badge">Archived</span>`:""}
+        </div>
+        <p class="muted">${esc(normaliseCategory(p))}</p>
+        <p class="product-price">${money(p.price)} <small>ex VAT</small></p>
+        <div class="colour-tiles compact">${(p.colours||[]).map(c=>`<span class="colour-tile"><span class="swatch" style="--swatch:${esc(c.hex||"#ccc")}"></span>${esc(c.name)}</span>`).join("")}</div>
+        <div class="actions">
+          <button class="ghost" onclick="showProductForm('${p.id}')">Edit</button>
+          <button class="ghost" onclick="duplicateProduct('${p.id}')">Duplicate</button>
+          ${p.isActive===false
+            ? `<button class="secondary" onclick="setProductActive('${p.id}',true)">Restore</button>`
+            : `<button class="secondary" onclick="setProductActive('${p.id}',false)">Archive</button>`}
+          <button class="danger" onclick="removeProduct('${p.id}')">Delete</button>
+        </div>
+      </div>
+    </article>`).join("");
+
+  const compactCards=shown.map(p=>`
+    <button class="compact-product-card ${p.isActive===false?"archived":""}" onclick="showProductForm('${p.id}')">
+      <div class="compact-product-image">
+        ${p.image?`<img src="${p.image}" alt="${esc(p.name)}">`:`<span>▦</span>`}
+      </div>
+      <div class="compact-product-info">
+        <strong>${esc(p.code)}</strong>
+        <span>${money(p.price)}</span>
+        <small>ex VAT</small>
+      </div>
+    </button>`).join("");
+
   main.innerHTML=`
-    <div class="toolbar-stack">
-      <input id="productSearch" class="search" placeholder="Search products" value="${esc(filter)}">
-      <div class="filter-chips">
-        <button class="filter-chip ${view==="active"?"selected":""}" data-view="active">Active</button>
-        <button class="filter-chip ${view==="archived"?"selected":""}" data-view="archived">Archived</button>
-        <button class="filter-chip ${view==="all"?"selected":""}" data-view="all">All</button>
+    <div class="toolbar-stack product-browser-toolbar">
+      <input id="productSearch" class="search" placeholder="Search products, codes or categories" value="${esc(filter)}">
+      <div class="product-toolbar-row">
+        <div class="filter-chips product-state-filters">
+          <button class="filter-chip ${view==="active"?"selected":""}" data-view="active">Active</button>
+          <button class="filter-chip ${view==="archived"?"selected":""}" data-view="archived">Archived</button>
+          <button class="filter-chip ${view==="all"?"selected":""}" data-view="all">All</button>
+        </div>
+        ${selectedCategory||searching?`<div class="display-toggle" aria-label="Product tile size">
+          <button class="${displayMode==="large"?"selected":""}" data-display="large" title="Large tiles">▦</button>
+          <button class="${displayMode==="compact"?"selected":""}" data-display="compact" title="Compact tiles">▦▦▦</button>
+        </div>`:""}
       </div>
     </div>
-    <div class="product-management-grid">${shown.length?shown.map(p=>`
-      <article class="management-product-card ${p.isActive===false?"archived":""}">
-        ${p.image?`<img src="${p.image}" alt="${esc(p.name)}">`:`<div class="catalogue-placeholder">▦</div>`}
-        <div class="management-card-body">
-          <div class="management-card-head">
-            <div><strong>${esc(p.code)}</strong><h3>${esc(p.name)}</h3></div>
-            ${p.isActive===false?`<span class="badge">Archived</span>`:""}
-          </div>
-          <p class="muted">${esc(p.category||"Uncategorised")}</p>
-          <p class="product-price">${money(p.price)} <small>ex VAT</small></p>
-          <div class="colour-tiles compact">${(p.colours||[]).map(c=>`<span class="colour-tile"><span class="swatch" style="--swatch:${esc(c.hex||"#ccc")}"></span>${esc(c.name)}</span>`).join("")}</div>
-          <div class="actions">
-            <button class="ghost" onclick="showProductForm('${p.id}')">Edit</button>
-            <button class="ghost" onclick="duplicateProduct('${p.id}')">Duplicate</button>
-            ${p.isActive===false
-              ? `<button class="secondary" onclick="setProductActive('${p.id}',true)">Restore</button>`
-              : `<button class="secondary" onclick="setProductActive('${p.id}',false)">Archive</button>`}
-            <button class="danger" onclick="removeProduct('${p.id}')">Delete</button>
-          </div>
-        </div>
-      </article>`).join(""):`<div class="empty">No products found.</div>`}</div>
+
+    ${selectedCategory?`
+      <div class="category-heading">
+        <div><span class="muted">Category</span><h2>${esc(selectedCategory)}</h2><p class="muted">${shown.length} matching product${shown.length===1?"":"s"}</p></div>
+        <button class="secondary" id="allCategoriesBtn">All categories</button>
+      </div>
+    `:""}
+
+    ${!selectedCategory&&!searching?`
+      <div class="section-head"><div><h2>Product categories</h2><p class="muted">Tap a category to open its products.</p></div><span class="badge">${categories.length}</span></div>
+      <div class="category-grid">${categoryCards||`<div class="empty">No categories found. Add a product to create one.</div>`}</div>
+    `:`
+      <div class="${displayMode==="compact"?"compact-product-grid":"product-management-grid"}">
+        ${shown.length?(displayMode==="compact"?compactCards:largeCards):`<div class="empty">No products found.</div>`}
+      </div>
+    `}
     <button class="fab" onclick="showProductForm()">+</button>`;
-  document.getElementById("productSearch").oninput=e=>productsPage(e.target.value,view);
-  document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>productsPage(filter,b.dataset.view));
+
+  document.getElementById("productSearch").oninput=e=>{
+    pageTitle.textContent="Products";
+    backBtn.classList.add("hidden");
+    productsPage(e.target.value,view,"");
+  };
+  document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{
+    pageTitle.textContent="Products";
+    backBtn.classList.add("hidden");
+    productsPage(filter,b.dataset.view,"");
+  });
+  document.querySelectorAll("[data-category]").forEach(b=>b.onclick=()=>{
+    const chosen=b.dataset.category;
+    pageTitle.textContent=`Products · ${chosen}`;
+    backBtn.classList.remove("hidden");
+    navState("products");
+    productsPage("",view,chosen);
+    window.scrollTo({top:0,behavior:"smooth"});
+  });
+  document.querySelectorAll("[data-display]").forEach(b=>b.onclick=()=>{
+    localStorage.setItem("vu-product-display",b.dataset.display);
+    productsPage(filter,view,selectedCategory);
+  });
+  const allCategoriesBtn=document.getElementById("allCategoriesBtn");
+  if(allCategoriesBtn)allCategoriesBtn.onclick=()=>{
+    pageTitle.textContent="Products";
+    backBtn.classList.add("hidden");
+    productsPage("",view,"");
+    window.scrollTo({top:0,behavior:"smooth"});
+  };
 }
+
 async function duplicateProduct(id){
   const p=await getOne("products",id);
   const copy={...structuredClone(p),id:uid("prd"),code:`${p.code}-COPY`,name:`${p.name} Copy`,isActive:true,updatedAt:new Date().toISOString()};
@@ -1725,7 +1816,7 @@ async function settingsPage(){
 
     <div class="card" style="margin-top:12px">
       <h2>Application</h2>
-      <p><strong>Version:</strong> 1.0 Alpha 7.3.2</p>
+      <p><strong>Version:</strong> 1.0 Alpha 7.3.3</p>
       <p><strong>Currency:</strong> South African Rand</p>
       <p><strong>VAT:</strong> 15%</p>
       <p class="muted">Phone-first local version. Cloud sync will be added later.</p>
