@@ -1,37 +1,31 @@
-# Vorster Unlimited Trading v1 — Alpha 7.3.1
+# Vorster Unlimited Trading v1 — Alpha 7.3.2
 
-Smart Dashboard.
+Mobile layout and dark-mode update.
 
 ## New in this sprint
 
-- Daily business briefing
-- Needs-attention list
-- Deliveries due today and overdue
-- Production jobs open for seven days or longer
-- Quotes expired or expiring within three days
-- Customers predicted overdue or due soon
-- Ranked sales opportunities
-- Expected order-value range
-- Likely product recommendation
-- Automatically generated daily action list
-- Current-month turnover
-- Month-on-month turnover comparison
-- Current-month order count
-- Average order value
-- Quote conversion rate
-- Top products this month
-- Top customers this month
-- Top colours this month
-- Direct links from every dashboard alert to the relevant record
-- Existing Alpha 7.2.2 data remains compatible
+- Fixed the six-button bottom navigation so it stays on one row
+- Added extra scroll clearance beneath all pages
+- Product action buttons now use a clear two-column layout
+- Floating Add and New Order buttons sit above the navigation
+- Floating buttons hide while scrolling down and return while scrolling up
+- Product search and filters stay visible while scrolling
+- Added a complete dark mode
+- Added a quick theme button in the top bar
+- Added Light Mode and Dark Mode choices under Settings
+- Theme choice is remembered on the phone
+- Paint colour swatches keep their original colours
+- Printed quotations and order documents remain white
+- Existing customers, products, orders, quotes and predictions remain compatible
 
 ## Test flow
 
-1. Open the Dashboard.
-2. Check Business Health figures.
-3. Open an item under Needs Attention.
-4. Open a ranked Sales Opportunity.
-5. Follow an item in Today's Action List.
-6. Confirm top products, customers and colours use this month's orders.
-7. Mark a delivery Delivered and confirm it disappears from attention.
-8. Convert a quote and confirm the conversion rate updates.
+1. Open Products and scroll to the bottom of a long product card.
+2. Confirm Edit, Duplicate, Archive and Delete can all be reached.
+3. Confirm Home, Products, Customers, Predict, Quotes and Orders remain on one navigation row.
+4. Scroll down and confirm the floating button moves out of the way.
+5. Scroll upward and confirm it returns.
+6. Tap the moon icon in the top bar.
+7. Check Products, Customers, Quotes, Orders and the Dashboard in dark mode.
+8. Open Settings > Appearance and switch between Light and Dark.
+9. Close and reopen the app and confirm the selected theme remains active.

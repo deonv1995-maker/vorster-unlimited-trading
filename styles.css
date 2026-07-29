@@ -15,7 +15,7 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
-body{padding-bottom:82px}
+body{padding-bottom:0}
 button,input,textarea,select{font:inherit}
 button{cursor:pointer}
 .hidden{display:none!important}
@@ -29,11 +29,11 @@ button{cursor:pointer}
 .brand-mini img{width:42px;height:42px;object-fit:cover;border-radius:13px;border:1px solid var(--border)}
 .brand-name{font-size:.62rem;letter-spacing:.15em;color:var(--accent);font-weight:900}
 h1{font-size:1.25rem;margin:2px 0 0}
-main{padding:14px;max-width:980px;margin:auto}
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:30;display:grid;grid-template-columns:repeat(5,1fr);padding:7px 5px calc(7px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--border)}
-.bottom-nav button{border:0;background:transparent;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px;border-radius:12px}
+main{padding:14px 14px calc(150px + env(safe-area-inset-bottom));max-width:980px;margin:auto;min-height:100vh}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:30;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));padding:7px 5px calc(7px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--border)}
+.bottom-nav button{border:0;background:transparent;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:0;padding:7px 2px;border-radius:12px;touch-action:manipulation}
 .bottom-nav button.active{background:var(--surface-soft);color:var(--primary);font-weight:900}
-.bottom-nav span{font-size:1.25rem}.bottom-nav small{font-size:.7rem}
+.bottom-nav span{font-size:1.18rem;line-height:1}.bottom-nav small{font-size:.61rem;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:15px;box-shadow:var(--shadow)}
 .grid{display:grid;gap:12px}.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
 .stat strong{display:block;font-size:1.65rem;margin-top:4px}.muted{color:var(--muted)}
@@ -56,7 +56,7 @@ main{padding:14px;max-width:980px;margin:auto}
 .badge.confirmed,.badge.completed,.badge.delivered,.badge.collected{background:#dceee5;color:#214e3e}
 .badge.cancelled{background:#f4dddd;color:var(--danger)}
 .empty{text-align:center;color:var(--muted);padding:34px 16px}
-.fab{position:fixed;right:18px;bottom:96px;z-index:25;width:58px;height:58px;border-radius:50%;border:0;background:var(--primary);color:white;font-size:2rem;box-shadow:var(--shadow)}
+.fab{position:fixed;right:18px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:25;width:58px;height:58px;border-radius:50%;border:0;background:var(--primary);color:white;font-size:2rem;box-shadow:var(--shadow)}
 form{display:grid;gap:13px}label{display:grid;gap:6px;font-weight:800;font-size:.9rem}
 input,textarea,select{width:100%;padding:12px;border:1px solid var(--border);border-radius:13px;background:#fff;color:var(--text)}
 textarea{min-height:86px;resize:vertical}
@@ -124,7 +124,7 @@ dialog::backdrop{background:rgba(0,0,0,.48)}
 .hero-card h2{margin:4px 0}.hero-card p{margin:0;opacity:.86}.hero-order-btn{background:#fff;color:var(--primary);white-space:nowrap}
 .dashboard-stats{margin-top:12px}.value-card{margin-top:12px}
 .quick-grid.premium .quick-card{min-height:125px}.quick-card small{display:block;margin-top:5px;color:var(--muted)}
-.new-order-fab{position:fixed;right:16px;bottom:94px;z-index:28;border:0;border-radius:999px;padding:14px 18px;background:var(--accent);color:#fff;font-weight:900;box-shadow:var(--shadow)}
+.new-order-fab{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:28;border:0;border-radius:999px;padding:14px 18px;background:var(--accent);color:#fff;font-weight:900;box-shadow:var(--shadow)}
 .toolbar-stack{display:grid;gap:8px}
 .product-management-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-top:10px}
 .management-product-card{background:var(--surface);border:1px solid var(--border);border-radius:18px;overflow:hidden;box-shadow:var(--shadow)}
@@ -242,3 +242,67 @@ dialog::backdrop{background:rgba(0,0,0,.48)}
 .smart-performance-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.smart-performance-grid h3{margin-top:0}.performance-row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:.76rem}.performance-row:last-child{border-bottom:0}.performance-row span{overflow:hidden;text-overflow:ellipsis}.performance-row strong{white-space:nowrap}
 @media(max-width:700px){.smart-performance-grid{grid-template-columns:1fr}}
 @media(max-width:440px){.opportunity-item{grid-template-columns:30px minmax(0,1fr)}.opportunity-score{grid-column:2;text-align:left;display:flex;gap:5px;align-items:baseline}}
+
+
+/* Alpha 7.3.2: mobile overlap and theme improvements */
+.theme-btn{width:42px;height:42px;flex:0 0 42px;border:1px solid var(--border);border-radius:13px;background:var(--surface);color:var(--primary);font-size:1.2rem;font-weight:900}
+.toolbar-stack{position:sticky;top:68px;z-index:16;padding:4px 0 8px;background:linear-gradient(var(--bg) 82%,transparent)}
+.management-card-body{padding-bottom:14px}
+.management-product-card .actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:13px}
+.management-product-card .actions button{width:100%;min-width:0}
+.fab,.new-order-fab{transition:transform .2s ease,opacity .2s ease}
+.fab-hidden{transform:translateY(110px);opacity:0;pointer-events:none}
+.theme-choice{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.theme-option{display:grid;grid-template-columns:48px 1fr;align-items:center;gap:10px;text-align:left;border:2px solid var(--border);border-radius:16px;padding:12px;background:var(--surface);color:var(--text);font-weight:900}
+.theme-option.selected{border-color:var(--primary);background:var(--surface-soft)}
+.theme-preview{display:block;width:48px;height:34px;border-radius:9px;border:1px solid var(--border);box-shadow:inset 0 -9px 0 rgba(53,88,74,.2)}
+.light-preview{background:#f6f5f2}
+.dark-preview{background:#111815;box-shadow:inset 0 -9px 0 #2b493d}
+@media(max-width:360px){
+  .bottom-nav small{font-size:.56rem}
+  .bottom-nav span{font-size:1.08rem}
+  .theme-choice{grid-template-columns:1fr}
+}
+@media(min-width:760px){
+  main{padding-bottom:24px}
+  .toolbar-stack{top:72px}
+}
+
+/* Full dark theme */
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0f1512;
+  --surface:#18201c;
+  --surface-soft:#222d27;
+  --text:#edf2ef;
+  --muted:#aeb8b2;
+  --primary:#78a88f;
+  --primary-dark:#5f9277;
+  --accent:#c66e65;
+  --border:#334139;
+  --danger:#ed8178;
+  --shadow:0 12px 30px rgba(0,0,0,.34);
+}
+:root[data-theme="dark"] .splash{background:#0f1512;color:var(--text)}
+:root[data-theme="dark"] .topbar{background:rgba(15,21,18,.94)}
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] textarea,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] .colour-tile,
+:root[data-theme="dark"] .filter-chip,
+:root[data-theme="dark"] .qty-row button,
+:root[data-theme="dark"] .basket-controls button,
+:root[data-theme="dark"] .basket-line{background:#131a17;color:var(--text)}
+:root[data-theme="dark"] dialog{background:var(--surface);color:var(--text)}
+:root[data-theme="dark"] .danger{background:#472724;color:#ffb2ab}
+:root[data-theme="dark"] .badge.confirmed,
+:root[data-theme="dark"] .badge.completed,
+:root[data-theme="dark"] .badge.delivered,
+:root[data-theme="dark"] .badge.collected{background:#244335;color:#bde8d1}
+:root[data-theme="dark"] .badge.cancelled,
+:root[data-theme="dark"] .badge.declined,
+:root[data-theme="dark"] .badge.expired{background:#492725;color:#ffc0ba}
+:root[data-theme="dark"] .order-doc,
+:root[data-theme="dark"] .professional-document{background:#fff;color:#202523}
+:root[data-theme="dark"] .toolbar-stack{background:linear-gradient(var(--bg) 82%,transparent)}
+:root[data-theme="dark"] .toast{background:#e8eee9;color:#17201b}

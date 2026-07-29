@@ -6,6 +6,30 @@ const dialog=document.getElementById("dialog");
 const toast=document.getElementById("toast");
 let route="dashboard";
 let deferredPrompt=null;
+let lastScrollY=window.scrollY;
+
+function preferredTheme(){
+  const stored=localStorage.getItem("vu-theme");
+  if(stored==="light"||stored==="dark")return stored;
+  return window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
+}
+function applyTheme(theme){
+  const selected=theme==="dark"?"dark":"light";
+  document.documentElement.dataset.theme=selected;
+  localStorage.setItem("vu-theme",selected);
+  const themeMeta=document.querySelector('meta[name="theme-color"]');
+  if(themeMeta)themeMeta.setAttribute("content",selected==="dark"?"#111815":"#35584a");
+  const button=document.getElementById("themeBtn");
+  if(button){
+    button.textContent=selected==="dark"?"☀":"☾";
+    button.setAttribute("aria-label",selected==="dark"?"Switch to light mode":"Switch to dark mode");
+    button.title=selected==="dark"?"Light mode":"Dark mode";
+  }
+}
+function toggleTheme(){
+  applyTheme(document.documentElement.dataset.theme==="dark"?"light":"dark");
+}
+applyTheme(preferredTheme());
 
 const uid=p=>`${p}_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
 const money=n=>new Intl.NumberFormat("en-ZA",{style:"currency",currency:"ZAR"}).format(Number(n||0));
@@ -103,11 +127,18 @@ if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
 window.addEventListener("beforeinstallprompt",e=>{
   e.preventDefault();deferredPrompt=e;document.getElementById("installBtn").classList.remove("hidden");
 });
+document.getElementById("themeBtn").onclick=toggleTheme;
 document.getElementById("installBtn").onclick=async()=>{
   if(deferredPrompt){deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;}
 };
 
 document.querySelectorAll(".bottom-nav button").forEach(b=>b.onclick=()=>navigate(b.dataset.route));
+window.addEventListener("scroll",()=>{
+  const current=window.scrollY;
+  const goingDown=current>lastScrollY&&current>90;
+  document.querySelectorAll(".fab,.new-order-fab").forEach(button=>button.classList.toggle("fab-hidden",goingDown));
+  lastScrollY=current;
+},{passive:true});
 backBtn.onclick=()=>{
   if(pageTitle.textContent==="Customer details") navigate("customers");
   else if(["Quote details","New quote","Edit quote"].includes(pageTitle.textContent)) navigate("quotes");
@@ -1637,6 +1668,7 @@ async function settingsPage(){
   companyAddress:"FARM118, UNIT 426, RIETFONTEIN, MULDERSDRIFT, 1747",
   vatNumber:"4810233942",
   registrationNumber:"CC 2005/063515/23",
+  theme:preferredTheme(),
   quoteTerms:"Quotation valid until the date shown. Prices are subject to stock availability. Delivery dates are confirmed once the order is accepted. Goods remain the property of Vorster Unlimited Trading until paid in full."};
   main.innerHTML=`
     <div class="card">
@@ -1666,6 +1698,22 @@ async function settingsPage(){
       <button id="saveQuoteSettings" class="primary">Save quotation details</button>
     </div>
 
+
+    <div class="card" style="margin-top:12px">
+      <h2>Appearance</h2>
+      <p class="muted">Choose the display that is most comfortable to use. Your choice is remembered on this phone.</p>
+      <div class="theme-choice" role="group" aria-label="Appearance">
+        <button id="lightThemeChoice" class="theme-option ${preferredTheme()==="light"?"selected":""}" type="button">
+          <span class="theme-preview light-preview"></span>
+          <strong>Light mode</strong>
+        </button>
+        <button id="darkThemeChoice" class="theme-option ${preferredTheme()==="dark"?"selected":""}" type="button">
+          <span class="theme-preview dark-preview"></span>
+          <strong>Dark mode</strong>
+        </button>
+      </div>
+    </div>
+
     <div class="card" style="margin-top:12px">
       <h2>Backup and restore</h2>
       <p class="muted">Data is currently stored on this phone. Export a backup regularly.</p>
@@ -1677,7 +1725,7 @@ async function settingsPage(){
 
     <div class="card" style="margin-top:12px">
       <h2>Application</h2>
-      <p><strong>Version:</strong> 1.0 Alpha 7.3.1</p>
+      <p><strong>Version:</strong> 1.0 Alpha 7.3.2</p>
       <p><strong>Currency:</strong> South African Rand</p>
       <p><strong>VAT:</strong> 15%</p>
       <p class="muted">Phone-first local version. Cloud sync will be added later.</p>
@@ -1717,6 +1765,18 @@ async function settingsPage(){
     await putOne("settings",settings);
     notify("Quotation details saved");
   };
+  const selectTheme=async theme=>{
+    applyTheme(theme);
+    settings.theme=theme;
+    settings.companyColours=colours;
+    settings.updatedAt=new Date().toISOString();
+    await putOne("settings",settings);
+    document.getElementById("lightThemeChoice").classList.toggle("selected",theme==="light");
+    document.getElementById("darkThemeChoice").classList.toggle("selected",theme==="dark");
+    notify(`${theme==="dark"?"Dark":"Light"} mode enabled`);
+  };
+  document.getElementById("lightThemeChoice").onclick=()=>selectTheme("light");
+  document.getElementById("darkThemeChoice").onclick=()=>selectTheme("dark");
   render();
   document.getElementById("restoreInput").onchange=restoreBackup;
 }
