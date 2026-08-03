@@ -101,6 +101,18 @@ const customerInsight=(orders,customerId)=>{
   return{history,status,statusLabel,confidence,lastOrder,daysSince,averageInterval:typicalInterval||averageInterval,
     predictedDate,averageValue,lowValue,highValue,products,colours};
 };
+const openSelectionSheet=element=>{
+  if(!element)return;
+  element.classList.remove("hidden");
+  element.classList.add("selection-sheet-open");
+  document.body.classList.add("sheet-active");
+};
+const closeSelectionSheet=element=>{
+  if(!element)return;
+  element.classList.remove("selection-sheet-open");
+  element.classList.add("hidden");
+  document.body.classList.remove("sheet-active");
+};
 const groupLinesByColour=lines=>{
   const groups={};
   for(const line of (lines||[])){
@@ -1069,7 +1081,7 @@ async function startQuote(existingId=""){
   function openPicker(id){
     selectedProduct=products.find(p=>p.id===id);selectedQty=1;
     selectedColour=(selectedProduct.colours||[])[0]||{name:"Standard",hex:"#bbbbbb"};
-    picker.classList.remove("hidden");
+    openSelectionSheet(picker);
     picker.innerHTML=`
       <div class="dialog-head"><div><strong>${esc(selectedProduct.code)}</strong><div>${esc(selectedProduct.name)}</div></div><button id="closeQuotePicker" class="close-btn">×</button></div>
       <label>Choose colour</label>
@@ -1083,12 +1095,14 @@ async function startQuote(existingId=""){
     });
     document.getElementById("quoteMinusQty").onclick=()=>{selectedQty=Math.max(1,selectedQty-1);document.getElementById("quoteQtyValue").textContent=selectedQty};
     document.getElementById("quotePlusQty").onclick=()=>{selectedQty++;document.getElementById("quoteQtyValue").textContent=selectedQty};
-    document.getElementById("closeQuotePicker").onclick=()=>picker.classList.add("hidden");
+    document.getElementById("closeQuotePicker").onclick=()=>closeSelectionSheet(picker);
     document.getElementById("addQuoteLine").onclick=()=>{
       const same=lines.find(l=>l.productId===selectedProduct.id&&l.colour.name===selectedColour.name);
       if(same)same.qty+=selectedQty;
       else lines.push({productId:selectedProduct.id,productCode:selectedProduct.code,productName:selectedProduct.name,colour:selectedColour,qty:selectedQty,unitPrice:Number(selectedProduct.price)});
-      picker.classList.add("hidden");renderBasket();notify("Added to quote");
+      closeSelectionSheet(picker);
+      renderBasket();
+      notify("Added to quote — choose the next product");
     };
   }
   function calculate(){
@@ -1440,7 +1454,7 @@ async function startOrder(existingId=""){
   function openPicker(id){
     selectedProduct=products.find(p=>p.id===id);selectedQty=1;
     selectedColour=(selectedProduct.colours||[])[0]||{name:"Standard",hex:"#bbbbbb"};
-    picker.classList.remove("hidden");
+    openSelectionSheet(picker);
     picker.innerHTML=`
       <div class="dialog-head"><div><strong>${esc(selectedProduct.code)}</strong><div>${esc(selectedProduct.name)}</div></div><button id="closePicker" class="close-btn">×</button></div>
       <label>Choose colour</label>
@@ -1454,12 +1468,14 @@ async function startOrder(existingId=""){
     });
     document.getElementById("minusQty").onclick=()=>{selectedQty=Math.max(1,selectedQty-1);document.getElementById("qtyValue").textContent=selectedQty};
     document.getElementById("plusQty").onclick=()=>{selectedQty++;document.getElementById("qtyValue").textContent=selectedQty};
-    document.getElementById("closePicker").onclick=()=>picker.classList.add("hidden");
+    document.getElementById("closePicker").onclick=()=>closeSelectionSheet(picker);
     document.getElementById("addLine").onclick=()=>{
       const same=lines.find(l=>l.productId===selectedProduct.id&&l.colour.name===selectedColour.name);
       if(same)same.qty+=selectedQty;
       else lines.push({productId:selectedProduct.id,productCode:selectedProduct.code,productName:selectedProduct.name,colour:selectedColour,qty:selectedQty,unitPrice:Number(selectedProduct.price)});
-      picker.classList.add("hidden");renderBasket();notify("Added to order");
+      closeSelectionSheet(picker);
+      renderBasket();
+      notify("Added to order — choose the next product");
     };
   }
   function calculate(){
@@ -1816,7 +1832,7 @@ async function settingsPage(){
 
     <div class="card" style="margin-top:12px">
       <h2>Application</h2>
-      <p><strong>Version:</strong> 1.0 Alpha 7.3.3</p>
+      <p><strong>Version:</strong> 1.0 Alpha 7.3.4</p>
       <p><strong>Currency:</strong> South African Rand</p>
       <p><strong>VAT:</strong> 15%</p>
       <p class="muted">Phone-first local version. Cloud sync will be added later.</p>
