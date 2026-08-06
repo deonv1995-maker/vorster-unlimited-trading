@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#35584a">
-  <meta name="description" content="Vorster Unlimited Trading mobile business app">
+  <meta name="description" content="Vorster Unlimited Trading operations app">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="vorster-logo.jpg" type="image/jpeg">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="inventory.css">
   <link rel="stylesheet" href="completion-schedule.css">
   <link rel="stylesheet" href="job-card-matching.css">
-  <link rel="stylesheet" href="v2-core.css">
+  <link rel="stylesheet" href="unified-core.css">
   <title>Vorster Unlimited Trading</title>
 </head>
 <body>
@@ -20,24 +20,14 @@
     <div class="splash-name">VORSTER UNLIMITED</div>
     <div class="splash-sub">TRADING</div>
   </div>
-
   <div id="app" class="app-shell hidden">
     <header class="topbar">
       <button id="backBtn" class="icon-btn hidden" aria-label="Back">←</button>
-      <div class="brand-mini">
-        <img src="vorster-logo.jpg" alt="">
-        <div>
-          <div class="brand-name">VORSTER UNLIMITED</div>
-          <h1 id="pageTitle">Dashboard</h1>
-        </div>
-      </div>
-      <a href="v2.html" style="display:inline-flex;align-items:center;justify-content:center;min-width:52px;height:48px;padding:0 13px;border:1px solid #355448;border-radius:15px;background:#83b69f;color:#102018;text-decoration:none;font-weight:900">V2</a>
+      <div class="brand-mini"><img src="vorster-logo.jpg" alt=""><div><div class="brand-name">VORSTER UNLIMITED</div><h1 id="pageTitle">Dashboard</h1></div></div>
       <button id="themeBtn" class="theme-btn" aria-label="Switch theme" title="Dark mode">☾</button>
       <button id="installBtn" class="install-btn hidden">Install</button>
     </header>
-
     <main id="main"></main>
-
     <nav class="bottom-nav">
       <button data-route="dashboard" class="active"><span>⌂</span><small>Home</small></button>
       <button data-route="products"><span>▦</span><small>Products</small></button>
@@ -47,10 +37,8 @@
       <button data-route="orders"><span>▤</span><small>Orders</small></button>
     </nav>
   </div>
-
   <dialog id="dialog"></dialog>
   <div id="toast" class="toast hidden"></div>
-
   <script src="db.js"></script>
   <script src="app.js"></script>
   <script src="inventory.js"></script>
@@ -64,7 +52,7 @@
   <script src="product-aliases-fix.js"></script>
   <script src="merge-products.js"></script>
   <script src="completion-schedule.js"></script>
-  <script src="v2-core.js"></script>
+  <script src="unified-core.js"></script>
   <script src="app-update.js"></script>
 </body>
 </html>
