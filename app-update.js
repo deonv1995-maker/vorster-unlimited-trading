@@ -1,4 +1,4 @@
-const APP_VERSION="1.0 Alpha 7.9.0";
+const APP_VERSION="1.0 Alpha 7.9.1";
 
 function applyDisplayedVersion(){
   document.querySelectorAll("p,strong,span,div").forEach(element=>{
