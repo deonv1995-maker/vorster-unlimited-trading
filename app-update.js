@@ -1,4 +1,4 @@
-const APP_VERSION="1.0 Alpha 7.8.6";
+const APP_VERSION="1.0 Alpha 7.9.0";
 
 function applyDisplayedVersion(){
   document.querySelectorAll("p,strong,span,div").forEach(element=>{
@@ -31,13 +31,9 @@ if("serviceWorker" in navigator){
         const worker=registration.installing;
         if(!worker)return;
         worker.addEventListener("statechange",()=>{
-          if(worker.state==="installed"&&navigator.serviceWorker.controller){
-            worker.postMessage({type:"SKIP_WAITING"});
-          }
+          if(worker.state==="installed"&&navigator.serviceWorker.controller){worker.postMessage({type:"SKIP_WAITING"})}
         });
       });
-    }catch(error){
-      console.warn("App update check failed",error);
-    }
+    }catch(error){console.warn("App update check failed",error)}
   });
 }
