@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#35584a">
+  <meta name="description" content="Vorster Unlimited Trading unified operations app">
+  <link rel="icon" href="vorster-logo.jpg" type="image/jpeg">
+  <link rel="stylesheet" href="styles.css?build=20260806-2050">
+  <link rel="stylesheet" href="inventory.css?build=20260806-2050">
+  <link rel="stylesheet" href="completion-schedule.css?build=20260806-2050">
+  <link rel="stylesheet" href="job-card-matching.css?build=20260806-2050">
+  <link rel="stylesheet" href="unified-core.css?build=20260806-2050">
+  <title>Vorster Unlimited Operations</title>
+</head>
+<body>
+  <div id="deploymentMarker" style="position:fixed;z-index:99999;top:4px;left:50%;transform:translateX(-50%);padding:5px 10px;border-radius:999px;background:#83b69f;color:#102018;font:800 11px system-ui">UNIFIED BUILD 20260806-2050</div>
+  <div id="splash" class="splash">
+    <img src="vorster-logo.jpg" alt="Vorster Unlimited">
+    <div class="splash-name">VORSTER UNLIMITED</div>
+    <div class="splash-sub">OPERATIONS</div>
+  </div>
+  <div id="app" class="app-shell hidden">
+    <header class="topbar">
+      <button id="backBtn" class="icon-btn hidden" aria-label="Back">←</button>
+      <div class="brand-mini"><img src="vorster-logo.jpg" alt=""><div><div class="brand-name">VORSTER UNLIMITED</div><h1 id="pageTitle">Dashboard</h1></div></div>
+      <button id="themeBtn" class="theme-btn" aria-label="Switch theme" title="Dark mode">☾</button>
+      <button id="installBtn" class="install-btn hidden">Install</button>
+    </header>
+    <main id="main"></main>
+    <nav class="bottom-nav">
+      <button data-route="dashboard" class="active"><span>⌂</span><small>Home</small></button>
+      <button data-route="products"><span>▦</span><small>Products</small></button>
+      <button data-route="customers"><span>◉</span><small>Customers</small></button>
+      <button data-route="visits"><span>⌖</span><small>Predict</small></button>
+      <button data-route="quotes"><span>▧</span><small>Quotes</small></button>
+      <button data-route="orders"><span>▤</span><small>Orders</small></button>
+    </nav>
+  </div>
+  <dialog id="dialog"></dialog>
+  <div id="toast" class="toast hidden"></div>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(rs => Promise.all(rs.map(r => r.unregister())));
+    }
+    if ('caches' in window) caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key))));
+  </script>
+  <script src="db.js?build=20260806-2050"></script>
+  <script src="app.js?build=20260806-2050"></script>
+  <script src="inventory.js?build=20260806-2050"></script>
+  <script src="production-capacity.js?build=20260806-2050"></script>
+  <script src="sage-sync.js?build=20260806-2050"></script>
+  <script src="job-card-import.js?build=20260806-2050"></script>
+  <script src="job-card-matching.js?build=20260806-2050"></script>
+  <script src="job-card-matching-fix.js?build=20260806-2050"></script>
+  <script src="job-card-connection-review.js?build=20260806-2050"></script>
+  <script src="product-aliases.js?build=20260806-2050"></script>
+  <script src="product-aliases-fix.js?build=20260806-2050"></script>
+  <script src="merge-products.js?build=20260806-2050"></script>
+  <script src="completion-schedule.js?build=20260806-2050"></script>
+  <script src="unified-core.js?build=20260806-2050"></script>
+</body>
+</html>
