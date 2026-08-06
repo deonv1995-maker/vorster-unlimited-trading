@@ -1,5 +1,5 @@
-const CACHE="vorster-trading-v1-alpha7-9-0";
-const ASSETS=["./","index.html","styles.css","inventory.css","completion-schedule.css","job-card-matching.css","production-workflow.css","db.js","app.js","inventory.js","production-capacity.js","sage-sync.js","job-card-import.js","job-card-matching.js","job-card-matching-fix.js","job-card-connection-review.js","product-aliases.js","product-aliases-fix.js","merge-products.js","merge-native.js","completion-schedule.js","production-workflow.js","app-update.js","manifest.webmanifest","vorster-logo.jpg"];
+const CACHE="vorster-trading-v1-alpha7-9-1";
+const ASSETS=["./","index.html","styles.css","inventory.css","completion-schedule.css","job-card-matching.css","production-workflow.css","db.js","app.js","inventory.js","production-capacity.js","sage-sync.js","job-card-import.js","job-card-matching.js","job-card-matching-fix.js","job-card-connection-review.js","product-aliases.js","product-aliases-fix.js","merge-products.js","merge-native.js","completion-schedule.js","production-workflow.js","confirmed-production-sync.js","app-update.js","manifest.webmanifest","vorster-logo.jpg"];
 
 self.addEventListener("install",event=>{
   self.skipWaiting();
