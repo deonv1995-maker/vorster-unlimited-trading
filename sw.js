@@ -1,5 +1,5 @@
-const CACHE="vorster-trading-v1-alpha7-8-3";
-const ASSETS=["./","index.html","styles.css","inventory.css","completion-schedule.css","job-card-matching.css","db.js","app.js","inventory.js","production-capacity.js","sage-sync.js","job-card-import.js","job-card-matching.js","job-card-matching-fix.js","job-card-connection-review.js","product-aliases.js","completion-schedule.js","app-update.js","manifest.webmanifest","vorster-logo.jpg"];
+const CACHE="vorster-trading-v1-alpha7-8-4";
+const ASSETS=["./","index.html","styles.css","inventory.css","completion-schedule.css","job-card-matching.css","db.js","app.js","inventory.js","production-capacity.js","sage-sync.js","job-card-import.js","job-card-matching.js","job-card-matching-fix.js","job-card-connection-review.js","product-aliases.js","product-aliases-fix.js","completion-schedule.js","app-update.js","manifest.webmanifest","vorster-logo.jpg"];
 
 self.addEventListener("install",event=>{
   self.skipWaiting();
