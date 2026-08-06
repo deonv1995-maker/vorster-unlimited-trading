@@ -1,5 +1,5 @@
-const CACHE="vorster-trading-v1-alpha7-6-1";
-const ASSETS=["./","index.html","styles.css","inventory.css","db.js","app.js","inventory.js","production-capacity.js","sage-sync.js","job-card-import.js","app-update.js","manifest.webmanifest","vorster-logo.jpg"];
+const CACHE="vorster-trading-v1-alpha7-7-0";
+const ASSETS=["./","index.html","styles.css","inventory.css","completion-schedule.css","db.js","app.js","inventory.js","production-capacity.js","sage-sync.js","job-card-import.js","completion-schedule.js","app-update.js","manifest.webmanifest","vorster-logo.jpg"];
 
 self.addEventListener("install",event=>{
   self.skipWaiting();
@@ -35,7 +35,7 @@ self.addEventListener("fetch",event=>{
   }
 
   event.respondWith(caches.match(request).then(cached=>{
-    const network=fetch(request).then(response=>{
+    const network=fetch(request,{cache:"no-cache"}).then(response=>{
       if(response&&response.ok){
         const copy=response.clone();
         caches.open(CACHE).then(cache=>cache.put(request,copy));
