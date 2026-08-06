@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#35584a">
+  <title>Vorster Unlimited V2</title>
+  <link rel="icon" href="vorster-logo.jpg" type="image/jpeg">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="v2-standalone.css">
+</head>
+<body>
+  <div class="v2-shell">
+    <header class="v2-header">
+      <a class="v2-back" href="./" aria-label="Back to current app">←</a>
+      <img src="vorster-logo.jpg" alt="Vorster Unlimited">
+      <div><small>VORSTER UNLIMITED</small><h1 id="v2Title">Operations Centre</h1></div>
+    </header>
+    <main id="v2Main"><section class="v2-card"><p>Loading your business data…</p></section></main>
+    <nav class="v2-nav">
+      <button data-v2-route="dashboard">Home</button>
+      <button data-v2-route="products">Products</button>
+      <button data-v2-route="merge">Merge</button>
+      <button data-v2-route="imports">Imports</button>
+      <button data-v2-route="orders">Orders</button>
+    </nav>
+  </div>
+  <script src="db.js"></script>
+  <script src="v2-standalone.js"></script>
+</body>
+</html>
