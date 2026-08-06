@@ -1,11 +1,11 @@
-const APP_VERSION="1.0 Alpha 7.8.0";
+const APP_VERSION="1.0 Alpha 7.8.1";
 
 function applyDisplayedVersion(){
   document.querySelectorAll("p,strong,span,div").forEach(element=>{
     if(element.children.length)return;
     const text=element.textContent||"";
-    if(text.includes("1.0 Alpha 7.3.4")){
-      element.textContent=text.replace("1.0 Alpha 7.3.4",APP_VERSION);
+    if(/1\.0 Alpha 7\.\d+\.\d+/.test(text)){
+      element.textContent=text.replace(/1\.0 Alpha 7\.\d+\.\d+/,APP_VERSION);
     }
   });
 }
@@ -26,9 +26,7 @@ if("serviceWorker" in navigator){
     try{
       const registration=await navigator.serviceWorker.register("sw.js",{updateViaCache:"none"});
       await registration.update();
-      if(registration.waiting){
-        registration.waiting.postMessage({type:"SKIP_WAITING"});
-      }
+      if(registration.waiting)registration.waiting.postMessage({type:"SKIP_WAITING"});
       registration.addEventListener("updatefound",()=>{
         const worker=registration.installing;
         if(!worker)return;
