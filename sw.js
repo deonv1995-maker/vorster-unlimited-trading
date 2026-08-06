@@ -1,5 +1,5 @@
-const CACHE="vorster-trading-v2-foundation-1-0-0";
-const ASSETS=["./","index.html","styles.css","inventory.css","completion-schedule.css","job-card-matching.css","v2-core.css","db.js","app.js","inventory.js","production-capacity.js","sage-sync.js","job-card-import.js","job-card-matching.js","job-card-matching-fix.js","job-card-connection-review.js","product-aliases.js","product-aliases-fix.js","merge-products.js","completion-schedule.js","v2-core.js","app-update.js","manifest.webmanifest","vorster-logo.jpg"];
+const CACHE="vorster-trading-v2-standalone-1-0-0";
+const ASSETS=["./","index.html","v2.html","styles.css","inventory.css","completion-schedule.css","job-card-matching.css","v2-core.css","v2-standalone.css","db.js","app.js","inventory.js","production-capacity.js","sage-sync.js","job-card-import.js","job-card-matching.js","job-card-matching-fix.js","job-card-connection-review.js","product-aliases.js","product-aliases-fix.js","merge-products.js","completion-schedule.js","v2-core.js","v2-standalone.js","app-update.js","manifest.webmanifest","vorster-logo.jpg"];
 
 self.addEventListener("install",event=>{
   self.skipWaiting();
@@ -22,14 +22,14 @@ self.addEventListener("fetch",event=>{
   const request=event.request;
   if(request.method!=="GET")return;
   const url=new URL(request.url);
-  if(request.mode==="navigate"||url.pathname.endsWith("/index.html")){
+  if(request.mode==="navigate"||url.pathname.endsWith("/index.html")||url.pathname.endsWith("/v2.html")){
     event.respondWith(fetch(request,{cache:"no-store"})
       .then(response=>{
         const copy=response.clone();
         caches.open(CACHE).then(cache=>cache.put(request,copy));
         return response;
       })
-      .catch(()=>caches.match(request).then(response=>response||caches.match("index.html"))));
+      .catch(()=>caches.match(request).then(response=>response||caches.match(url.pathname.endsWith("/v2.html")?"v2.html":"index.html"))));
     return;
   }
   event.respondWith(caches.match(request).then(cached=>{
