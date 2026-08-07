@@ -1,7 +1,8 @@
-/* Version 8.5.4 product search.
-   Android-safe search: build the searchable rows once when Products opens.
-   Typing only toggles existing rows; no page/result DOM is rebuilt while the input has focus. */
-const VU_PRODUCT_SEARCH_VERSION='8.5.4';
+/* Version 8.5.5 product search.
+   Android-safe search: searchable rows are built once when Products opens.
+   Typing only toggles existing rows; no page/result DOM is rebuilt while the input has focus.
+   Uses explicit display state so product-card CSS cannot override hidden search results. */
+const VU_PRODUCT_SEARCH_VERSION='8.5.5';
 
 const vuProductSearchBase=productsPage;
 let vuProductSearchItems=[];
@@ -56,26 +57,30 @@ function vuPSFilterStaticRows(value){
   if(!host)return;
 
   if(!inputText){
-    host.hidden=true;
+    host.style.display='none';
     vuPSSetNormalContentVisible(true);
     return;
   }
 
   vuPSSetNormalContentVisible(false);
-  host.hidden=false;
+  host.style.display='block';
   const words=inputText.split(/\s+/).filter(Boolean);
   const rows=[...host.querySelectorAll('[data-vu-search-product]')];
   let count=0;
+  const matched=[];
 
   rows.forEach(row=>{
     const haystack=row.dataset.vuSearch||'';
     const match=words.every(word=>haystack.includes(word));
-    row.hidden=!match;
-    if(match)count++;
+    row.style.display=match?'':'none';
+    if(match){
+      count++;
+      matched.push(row);
+    }
   });
 
   /* Rank exact and code-prefix matches without recreating any elements. */
-  rows.filter(row=>!row.hidden).sort((a,b)=>{
+  matched.sort((a,b)=>{
     const ac=a.dataset.vuCode||'';
     const bc=b.dataset.vuCode||'';
     const ar=ac===inputText?0:ac.startsWith(inputText)?1:2;
@@ -86,7 +91,7 @@ function vuPSFilterStaticRows(value){
   const countNode=document.getElementById('vuProductSearchCount');
   if(countNode)countNode.textContent=`${count} product${count===1?'':'s'} found`;
   const empty=document.getElementById('vuProductSearchEmpty');
-  if(empty)empty.hidden=count!==0;
+  if(empty)empty.style.display=count===0?'block':'none';
 }
 
 function vuPSBuildStaticIndex(){
@@ -98,12 +103,12 @@ function vuPSBuildStaticIndex(){
   const host=document.createElement('section');
   host.id='vuProductStaticSearch';
   host.className='vu-product-live-results';
-  host.hidden=true;
+  host.style.display='none';
   host.innerHTML=`
     <div class="section-head"><div><h2>Search results</h2><p id="vuProductSearchCount" class="muted">0 products found</p></div></div>
     <div class="compact-product-grid vu-live-search-grid">
       ${visibleItems.map(vuPSStaticCard).join('')}
-      <div id="vuProductSearchEmpty" class="empty" hidden>No products found.</div>
+      <div id="vuProductSearchEmpty" class="empty" style="display:none">No products found.</div>
     </div>`;
   toolbar.insertAdjacentElement('afterend',host);
 
