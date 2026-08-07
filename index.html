@@ -5,18 +5,18 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#35584a">
   <meta name="description" content="Vorster Unlimited Trading mobile business app">
-  <link rel="manifest" href="manifest.webmanifest?v=8.0.0">
-  <link rel="icon" href="vorster-logo.jpg?v=8.0.0" type="image/jpeg">
-  <link rel="stylesheet" href="styles.css?v=8.0.0">
-  <link rel="stylesheet" href="inventory.css?v=8.0.0">
-  <link rel="stylesheet" href="completion-schedule.css?v=8.0.0">
-  <link rel="stylesheet" href="job-card-matching.css?v=8.0.0">
-  <link rel="stylesheet" href="production-workflow.css?v=8.0.0">
+  <link rel="manifest" href="manifest.webmanifest?v=8.0.1">
+  <link rel="icon" href="vorster-logo.jpg?v=8.0.1" type="image/jpeg">
+  <link rel="stylesheet" href="styles.css?v=8.0.1">
+  <link rel="stylesheet" href="inventory.css?v=8.0.1">
+  <link rel="stylesheet" href="completion-schedule.css?v=8.0.1">
+  <link rel="stylesheet" href="job-card-matching.css?v=8.0.1">
+  <link rel="stylesheet" href="production-workflow.css?v=8.0.1">
   <title>Vorster Unlimited Trading</title>
 </head>
 <body>
   <div id="splash" class="splash">
-    <img src="vorster-logo.jpg?v=8.0.0" alt="Vorster Unlimited">
+    <img src="vorster-logo.jpg?v=8.0.1" alt="Vorster Unlimited">
     <div class="splash-name">VORSTER UNLIMITED</div>
     <div class="splash-sub">TRADING</div>
   </div>
@@ -25,11 +25,11 @@
     <header class="topbar">
       <button id="backBtn" class="icon-btn hidden" aria-label="Back">←</button>
       <div class="brand-mini">
-        <img src="vorster-logo.jpg?v=8.0.0" alt="">
+        <img src="vorster-logo.jpg?v=8.0.1" alt="">
         <div>
           <div class="brand-name">VORSTER UNLIMITED</div>
           <h1 id="pageTitle">Dashboard</h1>
-          <small id="runtimeBuild" style="display:block;font-size:10px;opacity:.65">V8.0.0</small>
+          <small id="runtimeBuild" style="display:block;font-size:10px;opacity:.65">V8.0.1</small>
         </div>
       </div>
       <button id="mergeNativeBtn" class="theme-btn" aria-label="Merge products" title="Merge products">⇄</button>
@@ -54,7 +54,8 @@
 
   <script>
   (async function bootVersion8(){
-    const BUILD='8.0.0';
+    const BUILD='8.0.1';
+
     try{
       if('serviceWorker' in navigator){
         const registrations=await navigator.serviceWorker.getRegistrations();
@@ -64,14 +65,17 @@
         const keys=await caches.keys();
         await Promise.all(keys.map(key=>caches.delete(key)));
       }
-    }catch(error){console.warn('Runtime cleanup failed',error)}
+    }catch(error){
+      console.warn('Legacy runtime cleanup failed',error);
+    }
 
     const scripts=[
+      'runtime-guard.js',
       'db.js','app.js','inventory.js','production-capacity.js','sage-sync.js',
       'job-card-import.js','job-card-matching.js','job-card-matching-fix.js',
       'job-card-connection-review.js','product-aliases.js','product-aliases-fix.js',
       'merge-products.js','merge-native.js','completion-schedule.js',
-      'production-workflow.js','confirmed-production-sync.js'
+      'production-workflow.js','workflow-bootstrap-v8.js'
     ];
 
     for(const file of scripts){
@@ -89,29 +93,17 @@
       document.querySelectorAll('p,strong,span,div').forEach(element=>{
         if(element.children.length)return;
         const text=element.textContent||'';
-        if(/1\.0 Alpha 7\.\d+\.\d+/.test(text)){
-          element.textContent=text.replace(/1\.0 Alpha 7\.\d+\.\d+/,'2.0 Version 8.0.0');
+        if(/1\.0 Alpha 7\.\d+\.\d+|2\.0 Version 8\.0\.0/.test(text)){
+          element.textContent=text.replace(/1\.0 Alpha 7\.\d+\.\d+|2\.0 Version 8\.0\.0/,'2.0 Version 8.0.1');
         }
       });
     };
+
     new MutationObserver(applyVersion).observe(document.documentElement,{childList:true,subtree:true});
     applyVersion();
-
-    setTimeout(async()=>{
-      try{
-        if('serviceWorker' in navigator){
-          const registrations=await navigator.serviceWorker.getRegistrations();
-          await Promise.all(registrations.map(registration=>registration.unregister()));
-        }
-        if('caches' in window){
-          const keys=await caches.keys();
-          await Promise.all(keys.map(key=>caches.delete(key)));
-        }
-      }catch(error){console.warn('Post-load cleanup failed',error)}
-    },1500);
   })().catch(error=>{
     console.error(error);
-    document.body.insertAdjacentHTML('afterbegin','<div style="padding:12px;background:#7a2424;color:white;font-family:system-ui">Version 8 could not load completely. Refresh once while online.</div>');
+    document.body.insertAdjacentHTML('afterbegin','<div style="padding:12px;background:#7a2424;color:white;font-family:system-ui">Version 8.0.1 could not load completely. Refresh once while online.</div>');
   });
   </script>
 </body>
