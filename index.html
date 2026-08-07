@@ -5,20 +5,20 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#35584a">
   <meta name="description" content="Vorster Unlimited Trading mobile business app">
-  <link rel="manifest" href="manifest.webmanifest?v=8.4.0">
-  <link rel="icon" href="vorster-logo.jpg?v=8.4.0" type="image/jpeg">
-  <link rel="stylesheet" href="styles.css?v=8.4.0">
-  <link rel="stylesheet" href="inventory.css?v=8.4.0">
-  <link rel="stylesheet" href="completion-schedule.css?v=8.4.0">
-  <link rel="stylesheet" href="job-card-matching.css?v=8.4.0">
-  <link rel="stylesheet" href="production-workflow.css?v=8.4.0">
-  <link rel="stylesheet" href="production-checklist-v8.css?v=8.4.0">
-  <link rel="stylesheet" href="business-pipeline-v8.css?v=8.4.0">
+  <link rel="manifest" href="manifest.webmanifest?v=8.5.0">
+  <link rel="icon" href="vorster-logo.jpg?v=8.5.0" type="image/jpeg">
+  <link rel="stylesheet" href="styles.css?v=8.5.0">
+  <link rel="stylesheet" href="inventory.css?v=8.5.0">
+  <link rel="stylesheet" href="completion-schedule.css?v=8.5.0">
+  <link rel="stylesheet" href="job-card-matching.css?v=8.5.0">
+  <link rel="stylesheet" href="production-workflow.css?v=8.5.0">
+  <link rel="stylesheet" href="production-checklist-v8.css?v=8.5.0">
+  <link rel="stylesheet" href="business-pipeline-v8.css?v=8.5.0">
   <title>Vorster Unlimited Trading</title>
 </head>
 <body>
   <div id="splash" class="splash">
-    <img src="vorster-logo.jpg?v=8.4.0" alt="Vorster Unlimited">
+    <img src="vorster-logo.jpg?v=8.5.0" alt="Vorster Unlimited">
     <div class="splash-name">VORSTER UNLIMITED</div>
     <div class="splash-sub">TRADING</div>
   </div>
@@ -27,11 +27,11 @@
     <header class="topbar">
       <button id="backBtn" class="icon-btn hidden" aria-label="Back">←</button>
       <div class="brand-mini">
-        <img src="vorster-logo.jpg?v=8.4.0" alt="">
+        <img src="vorster-logo.jpg?v=8.5.0" alt="">
         <div>
           <div class="brand-name">VORSTER UNLIMITED</div>
           <h1 id="pageTitle">Dashboard</h1>
-          <small id="runtimeBuild" style="display:block;font-size:10px;opacity:.65">V8.4.0</small>
+          <small id="runtimeBuild" style="display:block;font-size:10px;opacity:.65">V8.5.0</small>
         </div>
       </div>
       <button id="mergeNativeBtn" class="theme-btn" aria-label="Merge products" title="Merge products">⇄</button>
@@ -56,7 +56,7 @@
 
   <script>
   (async function bootVersion8(){
-    const BUILD='8.4.0';
+    const BUILD='8.5.0';
 
     try{
       if('serviceWorker' in navigator){
@@ -73,7 +73,7 @@
 
     const scripts=[
       'runtime-guard.js',
-      'db.js','app.js','inventory.js','production-capacity.js','sage-sync.js',
+      'db.js','app.js','inventory.js','raw-stock-v8.js','production-capacity.js','sage-sync.js',
       'job-card-import.js','job-card-matching.js','job-card-matching-fix.js',
       'job-card-connection-review.js','product-aliases.js','product-aliases-fix.js',
       'merge-products.js','merge-native.js','completion-schedule.js',
@@ -98,7 +98,7 @@
         if(element.children.length)return;
         const text=element.textContent||'';
         if(/1\.0 Alpha 7\.\d+\.\d+|2\.0 Version 8\.\d+\.\d+/.test(text)){
-          element.textContent=text.replace(/1\.0 Alpha 7\.\d+\.\d+|2\.0 Version 8\.\d+\.\d+/,'2.0 Version 8.4.0');
+          element.textContent=text.replace(/1\.0 Alpha 7\.\d+\.\d+|2\.0 Version 8\.\d+\.\d+/,'2.0 Version 8.5.0');
         }
       });
     };
@@ -107,7 +107,7 @@
     applyVersion();
   })().catch(error=>{
     console.error(error);
-    document.body.insertAdjacentHTML('afterbegin','<div style="padding:12px;background:#7a2424;color:white;font-family:system-ui">Version 8.4.0 could not load completely. Refresh once while online.</div>');
+    document.body.insertAdjacentHTML('afterbegin','<div style="padding:12px;background:#7a2424;color:white;font-family:system-ui">Version 8.5.0 could not load completely. Refresh once while online.</div>');
   });
   </script>
 </body>
