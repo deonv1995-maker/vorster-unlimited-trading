@@ -1,0 +1,35 @@
+/* Version 8.6 non-destructive UI polish. */
+:root{--vu-touch:46px}
+button,input,select,textarea{font:inherit}
+button{min-height:var(--vu-touch);touch-action:manipulation}
+input,select,textarea{font-size:16px}
+.search{min-height:52px}
+.workflow-tabs{position:sticky;top:92px;z-index:12;background:var(--bg,#0d1511);padding:8px 0;gap:8px;overflow-x:auto;scrollbar-width:none}
+.workflow-tabs::-webkit-scrollbar{display:none}
+.workflow-tab{white-space:nowrap;flex:0 0 auto;padding-inline:18px}
+.workflow-summary>div{min-width:0}
+.workflow-summary strong{word-break:break-word}
+.workflow-order-head{gap:12px;align-items:flex-start}
+.workflow-order-head>div{min-width:0}
+.workflow-order-head h3,.workflow-order-head small{overflow-wrap:anywhere}
+.workflow-badge{flex:0 0 auto;max-width:46%;text-align:center}
+.vu-check-line{align-items:center}
+.vu-check-main{min-width:0}
+.vu-check-main strong,.vu-check-main small{overflow-wrap:anywhere}
+.vu-check-controls button,.vu-check-box{min-width:44px;min-height:44px}
+.product-browser-toolbar{position:sticky;top:92px;z-index:11;background:var(--bg,#0d1511);padding-top:8px;padding-bottom:8px}
+.vu-product-live-results{padding-bottom:90px}
+.vu-static-search-card{min-height:0}
+.vu-polish-stage-note{margin:8px 0 14px;font-size:.9rem;opacity:.72}
+.vu-polish-target-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}
+.vu-polish-target-row button{margin:0}
+.vu-polish-status-strip{display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
+.vu-polish-status-strip::-webkit-scrollbar{display:none}
+.vu-polish-chip{flex:0 0 auto;border:1px solid var(--border,#31443a);border-radius:999px;padding:8px 12px;font-size:.86rem}
+@media(max-width:520px){
+  .workflow-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .workflow-badge{max-width:52%;font-size:.78rem}
+  .vu-polish-target-row{grid-template-columns:1fr}
+  .product-toolbar-row{align-items:flex-start}
+  .product-state-filters{display:flex;flex-wrap:wrap;gap:8px}
+}
