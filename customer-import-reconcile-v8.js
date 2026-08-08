@@ -1,7 +1,4 @@
-/* Version 8.7.5 — verified customer reconciliation after job-card import.
-   One canonical customer per Sage account/customer identity.
-   Imported customer metadata is persisted, orders are re-linked, and safe legacy duplicates are removed.
-*/
+/* Version 8.7.6 — verified customer reconciliation with durable order snapshots. */
 (function(){
   const text=v=>String(v??'').trim();
   const nameKey=v=>text(v).toLowerCase().replace(/\s+/g,' ');
@@ -56,8 +53,6 @@
       const cardOrderNo=codeKey(card.orderNumber);
       const meta=metaFromCard(card);
       const order=orders.find(o=>codeKey(o.orderNumber)===cardOrderNo);
-
-      // Safe candidate rule: exact Sage code, or exact name only where the stored record has no conflicting Sage code.
       const candidates=customers.filter(c=>{
         const storedCode=codeKey(c.accountCode);
         if(cardCode&&storedCode===cardCode)return true;
@@ -71,11 +66,9 @@
       if(!candidates.length){missing.push(`${card.orderNumber}: ${cardName}`);continue;}
       matched++;
 
-      // Prefer the customer already linked to this order, then exact Sage-code record, then first safe name match.
       let canonical=(order?.customerId&&candidates.find(c=>c.id===order.customerId))||candidates.find(c=>cardCode&&codeKey(c.accountCode)===cardCode)||candidates[0];
       let merged={...canonical};
       for(const candidate of candidates)if(candidate.id!==canonical.id)merged=mergeExistingFields(merged,candidate);
-
       if(cardCode)merged.accountCode=text(card.customerCode||card.accountCode);
       if(cardName)merged.name=cardName;
       if(meta.vatNumber)merged.vatNumber=meta.vatNumber;
@@ -93,7 +86,6 @@
       await putOne('customers',merged);
       updated++;
 
-      // Re-link all orders from safe duplicate customer IDs before deleting duplicates.
       const duplicateIds=candidates.filter(c=>c.id!==merged.id).map(c=>c.id);
       for(const existingOrder of orders){
         if(existingOrder.customerId===merged.id||duplicateIds.includes(existingOrder.customerId)||codeKey(existingOrder.orderNumber)===cardOrderNo){
@@ -102,6 +94,16 @@
           }
           if(codeKey(existingOrder.orderNumber)===cardOrderNo){
             const deliveryAddress=meta.deliveryAddress||meta.address||merged.primaryDeliveryAddress||merged.deliveryAddress||merged.address||'';
+            existingOrder.customerSnapshot={
+              accountCode:cardCode||merged.accountCode||'',name:cardName||merged.name||'',vatNumber:meta.vatNumber||merged.vatNumber||'',
+              contactPerson:meta.contactPerson||merged.contactPerson||'',phone:meta.phone||merged.phone||'',whatsapp:meta.whatsapp||merged.whatsapp||'',
+              email:meta.email||merged.email||'',address:meta.address||merged.address||'',deliveryAddress:deliveryAddress,
+              deliveryArea:meta.area||merged.deliveryArea||merged.area||'',preference:meta.preference||merged.preference||'Delivery',source:'Job Card Import',capturedAt:now
+            };
+            existingOrder.customerVatNumber=existingOrder.customerSnapshot.vatNumber;
+            existingOrder.customerAddress=existingOrder.customerSnapshot.address;
+            existingOrder.customerContactPerson=existingOrder.customerSnapshot.contactPerson;
+            existingOrder.customerPhone=existingOrder.customerSnapshot.phone;
             if(deliveryAddress){existingOrder.deliveryAddressSnapshot=deliveryAddress;existingOrder.deliveryAddress=deliveryAddress;}
             if(meta.area){existingOrder.deliveryArea=meta.area;existingOrder.area=meta.area;}
             if(meta.contactPerson)existingOrder.deliveryContact=meta.contactPerson;
@@ -115,14 +117,11 @@
       }
       for(const id of duplicateIds){await deleteOne('customers',id);duplicatesRemoved++;}
 
-      // Verify persisted fields from IndexedDB, not just the in-memory object.
       const persisted=await getOne('customers',merged.id);
       const expected=[meta.vatNumber,meta.contactPerson,meta.phone,meta.address,meta.deliveryAddress].filter(Boolean);
       const actual=[persisted?.vatNumber,persisted?.contactPerson,persisted?.phone,persisted?.address,persisted?.deliveryAddress].filter(Boolean);
       if(!expected.length||actual.length)verified++;
-
-      customers=await getAll('customers');
-      orders=await getAll('orders');
+      customers=await getAll('customers');orders=await getAll('orders');
     }
     return{matched,updated,verified,duplicatesRemoved,ordersRelinked,missing};
   }
@@ -136,13 +135,10 @@
       if(!snapshot.length)return;
       const result=await reconcileImportedCustomers(snapshot);
       const message=`Customer verification: ${result.verified}/${result.matched} persisted · ${result.duplicatesRemoved} duplicate records removed · ${result.ordersRelinked} orders re-linked`;
-      console.info(message,result);
-      if(typeof notify==='function')notify(message);
-      // Give a durable result because mobile toasts can disappear quickly.
+      console.info(message,result);if(typeof notify==='function')notify(message);
       setTimeout(()=>alert(`${message}${result.missing.length?`\n\nUnmatched:\n${result.missing.join('\n')}`:''}`),150);
     };
     window.commitJobCardImport=commitJobCardImport;
   }
-
   window.reconcileImportedCustomers=reconcileImportedCustomers;
 })();
