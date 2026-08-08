@@ -1,17 +1,12 @@
-/* V8.9.2 — Settings cleanup and manager print-centre entry. */
+/* V8.9.2 — final Settings cleanup and manager print-centre entry. */
 (function(){
   const previousSettingsPage=settingsPage;
-  settingsPage=async function(...args){
-    await previousSettingsPage(...args);
 
-    // Older matching wrappers can render the same entry more than once.
-    // Keep the first functional entry and remove visual duplicates only.
-    const matchingPanels=[...main.querySelectorAll('.import-matching-panel')];
-    matchingPanels.slice(1).forEach(el=>el.remove());
-    const matchingCards=[...main.querySelectorAll('.card')].filter(el=>/^\s*Match imported records\b/i.test(el.textContent||''));
-    if(matchingCards.length>1)matchingCards.slice(1).forEach(el=>el.remove());
+  function cleanSettings(){
+    const cards=[...main.querySelectorAll('.card')];
+    const matching=cards.filter(card=>[...card.querySelectorAll('h1,h2,h3')].some(h=>/^Match imported records$/i.test((h.textContent||'').trim())));
+    matching.slice(1).forEach(card=>card.remove());
 
-    // Daily work sheets are a manager operation, so expose them clearly in Settings.
     let section=document.getElementById('vuDailyWorkPackEntry');
     if(!section){
       section=document.createElement('section');
@@ -23,7 +18,7 @@
           <div>
             <div class="step-label">Manager print centre</div>
             <h2>Daily PDF work sheets</h2>
-            <p class="muted">Print the live target-driven work pack for Production, Finishing & Painting, and Delivery / Collection.</p>
+            <p class="muted">Create the live daily work pack for Production, Finishing & Painting, and Delivery / Collection. The sheets use the current orders, raw stock, capacity, workflow and daily invoice target.</p>
           </div>
           <span class="badge">PDF</span>
         </div>
@@ -36,10 +31,15 @@
       else if(backup)backup.insertAdjacentElement('beforebegin',section);
       else main.appendChild(section);
     }
+
     const btn=document.getElementById('vuOpenDailyWorkPacks');
-    if(btn)btn.onclick=()=>{
-      if(typeof openDailyWorkPacks==='function')openDailyWorkPacks(new Date());
-      else notify('Daily work sheets are still loading. Try again in a moment.');
-    };
+    if(btn)btn.onclick=()=>typeof openDailyWorkPacks==='function'?openDailyWorkPacks(new Date()):notify('Daily work sheets are unavailable. Refresh the app once while online.');
+  }
+
+  settingsPage=async function(...args){
+    await previousSettingsPage(...args);
+    cleanSettings();
+    // Some legacy settings extensions append asynchronously; one final pass keeps the page deterministic.
+    requestAnimationFrame(cleanSettings);
   };
 })();
