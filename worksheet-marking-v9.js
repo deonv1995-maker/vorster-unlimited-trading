@@ -1,9 +1,8 @@
-/* Version 9.0.4 — printable worksheet completion marking. */
+/* Version 9.0.6 — printable worksheet completion marking with workforce-safe financial privacy. */
 (function(){
 'use strict';
 const n=v=>Math.max(0,Number(v||0));
 const safe=v=>typeof esc==='function'?esc(v):String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-const cash=v=>typeof money==='function'?money(v):`R ${Number(v||0).toFixed(2)}`;
 const colour=l=>l?.colour?.name||l?.colourName||'Standard';
 const isProduct=l=>!window.VUOrderLineClassifications||window.VUOrderLineClassifications.isProduct(l);
 const display=v=>new Intl.DateTimeFormat('en-ZA',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(new Date(`${v}T12:00:00`));
@@ -17,8 +16,6 @@ body{font:10.5px Arial,sans-serif;color:#111;margin:0}
 .head{display:flex;justify-content:space-between;gap:12px;border-bottom:3px solid #111;padding-bottom:7px;margin-bottom:7px}
 .head h1{font-size:20px;margin:0 0 3px}
 .head p{margin:1px 0}
-.target{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:7px 0}
-.target>div{border:1px solid #888;padding:5px}.target b{display:block;font-size:13px;margin-top:2px}
 .job{border:1px solid #777;margin:8px 0;padding:6px;break-inside:avoid}.job.target-job{border:2px solid #111}
 .job h2{font-size:13px;margin:0 0 4px}.job p{margin:2px 0}
 table{width:100%;border-collapse:collapse;margin-top:5px;table-layout:fixed}
@@ -32,11 +29,6 @@ th.mark,td.mark{width:7%;text-align:center}th.qty,td.qty{width:12%;text-align:ce
 @media print{.bar{display:none}}
 `;
 
-function targetBlock(p,value){
-  if(!(p.target>0))return'';
-  const gap=Math.max(0,p.target-value),surplus=Math.max(0,value-p.target);
-  return `<div class="target"><div>Daily invoice target<b>${safe(cash(p.target))}</b></div><div>Target-linked value<b>${safe(cash(value))}</b></div><div>${gap?'Gap':'Above target'}<b>${gap?safe(cash(gap)):'+'+safe(cash(surplus))}</b></div></div>`;
-}
 function lineTable(lines){
   return `<table><thead><tr><th class="mark">✓</th><th class="mark">X</th><th>Code / item</th><th>Colour</th><th class="qty">Planned</th><th class="done">Qty completed</th></tr></thead><tbody>${lines.map(x=>`<tr><td class="mark"><span class="box"></span></td><td class="mark"><span class="box"></span></td><td><b>${safe(x.code||'')}</b><br>${safe(x.name||'')}</td><td>${safe(x.colour||'Standard')}</td><td class="qty"><b>${n(x.qty)}</b></td><td class="done"><span class="writebox"></span></td></tr>`).join('')}</tbody></table>`;
 }
@@ -58,9 +50,8 @@ function footer(){return `<div class="legend"><b>Team marking:</b> Tick ✓ if t
 function sheet(stage,p){
   const title={production:'Production Worksheet',finishing:'Finishing Worksheet',painting:'Painting Worksheet',delivery:'Delivery & Collection Worksheet'}[stage];
   const rows=stage==='delivery'?p.delivery:p[stage];
-  const value=stage==='delivery'?p.deliveryValue:p.basketValue;
   const body=stage==='production'?productionJobs(p):(rows||[]).map(orderJob).join('')||`<p>No ${safe(stage)} work forecast for this date.</p>`;
-  return `<section class="sheet"><div class="head"><div><h1>${title}</h1><p>${safe(display(p.date))}</p><p>Vorster Unlimited Trading · Daily operational worksheet</p></div><strong>${stage==='delivery'?safe(cash(p.deliveryValue)):`${rows?.length||0} jobs`}</strong></div>${targetBlock(p,value)}${body}${footer()}</section>`;
+  return `<section class="sheet"><div class="head"><div><h1>${title}</h1><p>${safe(display(p.date))}</p><p>Vorster Unlimited Trading · Daily operational worksheet</p></div><strong>${stage==='production'?`${p.productionItems?.length||0} lines`:`${rows?.length||0} jobs`}</strong></div>${body}${footer()}</section>`;
 }
 async function printMarkedWorksheets(stage,date){
   if(typeof window.buildWorkflowForecast!=='function')return;
