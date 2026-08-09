@@ -1,6 +1,8 @@
-/* V9.0.11 — automatic imported-customer relinking.
-   Runs at the order persistence boundary so a Sage import finishes under the correct
-   existing customer even when the PDF parser temporarily misreads an address as a name.
+/* V9.0.14 — strict Sage customer identity matching.
+   Imported orders may only auto-relink on stable identity evidence: Sage account code,
+   VAT number, or an exact normalized customer name when no stable identifier exists.
+   Area/branch similarity is deliberately never sufficient because different customers can
+   share the same suburb (for example BUCO Honeydew and Colourful Honeydew).
 */
 (function(){
   const basePutOne=putOne;
@@ -13,7 +15,7 @@
 
   function evidenceFor(customer,orders){
     const linked=orders.filter(o=>o.customerId===customer.id);
-    const codes=new Set(),vats=new Set(),names=new Set([key(customer.name)]),areas=new Set();
+    const codes=new Set(),vats=new Set(),names=new Set([key(customer.name)].filter(Boolean));
     if(customer.accountCode)codes.add(code(customer.accountCode));
     if(customer.vatNumber)vats.add(vat(customer.vatNumber));
     for(const o of linked){
@@ -21,31 +23,35 @@
       [s.accountCode,o.customerCode].filter(Boolean).forEach(x=>codes.add(code(x)));
       [s.vatNumber,o.customerVatNumber].filter(Boolean).forEach(x=>vats.add(vat(x)));
       [s.name,o.customerName].filter(Boolean).forEach(x=>names.add(key(x)));
-      [s.deliveryArea,o.deliveryArea,o.area].filter(Boolean).forEach(x=>areas.add(key(x)));
     }
-    return{customer,codes,vats,names,areas};
+    return{customer,codes,vats,names};
   }
 
-  function scoreCandidate(order,current,e){
-    if(e.customer.id===current?.id)return -1;
+  function chooseTarget(order,current,customers,orders){
     const s=order.customerSnapshot||{};
-    const wantedCode=code(s.accountCode||order.customerCode||current?.accountCode);
-    const wantedVat=vat(order.customerVatNumber||s.vatNumber||current?.vatNumber);
-    const rawNames=[s.name,order.customerName,current?.name].filter(Boolean);
-    const wantedNames=rawNames.filter(n=>!addressLike(n)).map(key).filter(Boolean);
-    const area=key(order.deliveryArea||order.area||s.deliveryArea||'');
-    let score=0;
-    if(wantedCode&&e.codes.has(wantedCode))score+=100;
-    if(wantedVat&&e.vats.has(wantedVat))score+=90;
-    for(const n of wantedNames){if(e.names.has(n))score=Math.max(score,80);}
-    if(area&&(e.areas.has(area)||key(e.customer.name).includes(area)))score=Math.max(score,45);
-    const source=key(rawNames.join(' '));
-    const branch=area||wantedNames.find(n=>n.includes('honeydew'))||'';
-    if(branch&&source.includes('buco')){
-      const cname=key(e.customer.name);
-      if(cname.includes('buco')&&cname.includes(branch))score=Math.max(score,70);
+    const wantedCode=code(s.accountCode||order.customerCode||'');
+    const wantedVat=vat(order.customerVatNumber||s.vatNumber||'');
+    const rawName=text(s.originalName||s.importedName||s.name||order.importedCustomerName||order.customerName||'');
+    const wantedName=!addressLike(rawName)?key(rawName):'';
+    const evidence=customers.map(c=>evidenceFor(c,orders));
+
+    // Stable identifiers are authoritative. If more than one customer carries the same
+    // identifier we stop rather than guess and corrupt another customer's history.
+    if(wantedCode){
+      const hits=evidence.filter(e=>e.codes.has(wantedCode));
+      if(hits.length===1)return hits[0].customer;
+      if(hits.length>1)return null;
     }
-    return score;
+    if(wantedVat){
+      const hits=evidence.filter(e=>e.vats.has(wantedVat));
+      if(hits.length===1)return hits[0].customer;
+      if(hits.length>1)return null;
+    }
+    if(wantedName){
+      const hits=evidence.filter(e=>e.names.has(wantedName));
+      if(hits.length===1)return hits[0].customer;
+    }
+    return null;
   }
 
   async function repairOrder(orderId){
@@ -55,21 +61,17 @@
     if(!order||!imported(order))return order;
     const current=customers.find(c=>c.id===order.customerId);
     if(!current)return order;
-    const ranked=customers.map(c=>evidenceFor(c,orders)).map(e=>({e,score:scoreCandidate(order,current,e)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
-    if(!ranked.length||ranked[0].score<45)return order;
-    if(ranked[1]&&ranked[1].score===ranked[0].score)return order;
-    const target=ranked[0].e.customer;
-    if(target.id===current.id)return order;
+    const target=chooseTarget(order,current,customers,orders);
+    if(!target||target.id===current.id)return order;
 
-    const snap=order.customerSnapshot||{},now=new Date().toISOString();
-    if(!text(target.accountCode)&&text(snap.accountCode))target.accountCode=text(snap.accountCode);
+    const snap=order.customerSnapshot||{},now=new Date().toISOString(),oldId=current.id;
+    if(!text(target.accountCode)&&text(snap.accountCode||order.customerCode))target.accountCode=text(snap.accountCode||order.customerCode);
     if(!text(target.vatNumber)&&text(order.customerVatNumber||snap.vatNumber))target.vatNumber=text(order.customerVatNumber||snap.vatNumber);
     if(!text(target.deliveryAddress)&&text(order.deliveryAddress||snap.deliveryAddress))target.deliveryAddress=text(order.deliveryAddress||snap.deliveryAddress);
     target.updatedAt=now;await basePutOne('customers',target);
 
-    const oldId=order.customerId;
     order.customerId=target.id;order.customerName=target.name;
-    order.customerSnapshot={...snap,name:target.name,accountCode:text(snap.accountCode||target.accountCode),vatNumber:text(order.customerVatNumber||snap.vatNumber||target.vatNumber)};
+    order.customerSnapshot={...snap,name:target.name,accountCode:text(snap.accountCode||order.customerCode||target.accountCode),vatNumber:text(order.customerVatNumber||snap.vatNumber||target.vatNumber)};
     order.updatedAt=now;await basePutOne('orders',order);
     for(const j of jobs.filter(j=>j.orderId===order.id&&j.customerId!==target.id)){j.customerId=target.id;j.customerName=target.name;j.updatedAt=now;await basePutOne('productionJobs',j);}
     for(const d of deliveries.filter(d=>d.orderId===order.id&&d.customerId!==target.id)){d.customerId=target.id;d.customerName=target.name;d.updatedAt=now;await basePutOne('deliveries',d);}
@@ -87,9 +89,7 @@
     return saved;
   };
 
-  const previousRepair=window.repairImportedCustomerLinks;
   window.repairImportedCustomerLinks=async function(showNotice=false){
-    if(typeof previousRepair==='function')await previousRepair(false);
     const orders=await getAll('orders');let changed=0;
     for(const o of orders.filter(imported)){
       const before=o.customerId,after=await repairOrder(o.id);if(after&&after.customerId!==before)changed++;
@@ -97,15 +97,6 @@
     if(showNotice)notify(changed?`Customer links repaired: ${changed} order${changed===1?'':'s'}`:'No imported customer links needed repair');
     return{relinked:changed};
   };
-
-  if(typeof settingsPage==='function'){
-    const baseSettingsPage=settingsPage;
-    settingsPage=async function(...args){
-      await baseSettingsPage(...args);
-      const btn=document.getElementById('repairImportedCustomerLinksBtn');
-      if(btn)btn.onclick=async()=>{await window.repairImportedCustomerLinks(true);navigate('customers');};
-    };
-  }
 
   setTimeout(()=>window.repairImportedCustomerLinks(false).catch(err=>console.warn('Startup customer repair failed',err)),0);
 })();
