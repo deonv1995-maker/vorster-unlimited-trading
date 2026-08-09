@@ -1,0 +1,5 @@
+V9.0.17
+- Repairs imported orders whose PDF customer identity was corrupted to an address/Sales Rep value.
+- Uses the linked imported customer profile VAT to recover the correct existing Sage-coded customer.
+- Keeps Sage account code authoritative.
+- Repairs linked production and delivery records and removes unused malformed imported customer records.
