@@ -1,0 +1,6 @@
+Regression cases:
+1. QU125057 imported as address + Sales Rep/DEON must resolve to BH023 / BUCO - HONEYDEW using VAT 4820238352 from the linked imported customer profile.
+2. Colourful Honeydew remains COL098 / COLOURFUL NURSERY HONEYDEW with VAT 4450207586.
+3. Same suburb name must never be used as identity evidence.
+4. Production jobs and deliveries must follow the corrected order customer link.
+5. Unused malformed address-created imported customer profile may be deleted only after relinking.
