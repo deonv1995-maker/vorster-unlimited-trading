@@ -1,0 +1,103 @@
+/* V9.0.22 — mobile polish and dark-mode contrast fixes. Non-destructive UI only. */
+
+/* Prevent sticky toolbars from visually bleeding into the first card underneath. */
+.toolbar-stack,
+.product-browser-toolbar{
+  background:var(--bg)!important;
+  padding-bottom:12px!important;
+}
+.customer-card-grid{margin-top:14px!important}
+.product-browser-toolbar{margin-top:0!important}
+
+/* Mobile header: keep page title readable instead of squeezing it behind controls. */
+.topbar{min-width:0}
+.brand-mini,.brand-mini>div{min-width:0}
+#pageTitle{min-width:0;overflow-wrap:anywhere;line-height:1.08}
+@media(max-width:620px){
+  .topbar{gap:7px;padding:10px 10px}
+  .brand-mini{gap:8px}
+  .brand-mini img{width:40px;height:40px;flex:0 0 40px}
+  .brand-name{font-size:.56rem}
+  #pageTitle{font-size:1.08rem;max-width:14ch}
+  #mergeNativeBtn{display:none!important}
+  .theme-btn{width:40px;height:40px;flex-basis:40px}
+  .install-btn{min-height:40px;padding:8px 11px;font-size:.82rem}
+}
+@media(max-width:390px){
+  #pageTitle{font-size:1rem;max-width:11ch}
+  .install-btn{padding-inline:9px}
+}
+
+/* Dashboard figures must stay inside their own cards. */
+.smart-health-grid>*{min-width:0}
+.smart-health-grid .stat strong{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:normal;line-height:1.05}
+@media(max-width:520px){
+  .smart-health-grid .stat{padding:13px}
+  .smart-health-grid .stat strong{font-size:1.28rem}
+  .smart-health-grid .stat small{font-size:.68rem}
+}
+@media(max-width:380px){
+  .smart-health-grid{grid-template-columns:1fr!important}
+}
+
+/* Dark-mode legibility for normal app surfaces. */
+:root[data-theme="dark"] .muted,
+:root[data-theme="dark"] .category-tile-body span,
+:root[data-theme="dark"] .category-tile-body small,
+:root[data-theme="dark"] .compact-product-info small,
+:root[data-theme="dark"] .customer-card .muted,
+:root[data-theme="dark"] .customer-card p.muted,
+:root[data-theme="dark"] .management-product-card .muted,
+:root[data-theme="dark"] .section-head .muted{
+  color:#b9c4be!important;
+}
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder{color:#8f9c95!important;opacity:1}
+:root[data-theme="dark"] .customer-note{background:#243129;color:#eef4f0}
+:root[data-theme="dark"] .badge{color:#e8f1ec}
+
+/* Printed/order document stays a light document even while the app is dark. */
+:root[data-theme="dark"] .order-doc,
+:root[data-theme="dark"] .order-doc *,
+:root[data-theme="dark"] .professional-document,
+:root[data-theme="dark"] .professional-document *{
+  color:#202523;
+}
+:root[data-theme="dark"] .order-doc .muted,
+:root[data-theme="dark"] .professional-document .muted{color:#626b66!important}
+:root[data-theme="dark"] .order-doc .colour-group,
+:root[data-theme="dark"] .order-doc .total-box,
+:root[data-theme="dark"] .order-doc .basket-line,
+:root[data-theme="dark"] .order-doc .linked-document{
+  background:#f4f6f4!important;
+  border-color:#d8ded9!important;
+}
+:root[data-theme="dark"] .order-doc .colour-group-head h3,
+:root[data-theme="dark"] .order-doc .product-price{color:#35584a!important}
+:root[data-theme="dark"] .order-doc .badge,
+:root[data-theme="dark"] .professional-document .badge{color:#214e3e!important}
+
+/* Category/product pages: reduce dead space and keep controls aligned on phones. */
+@media(max-width:620px){
+  .product-toolbar-row{align-items:flex-start;gap:8px}
+  .product-state-filters{flex:1 1 auto}
+  .display-toggle{margin-left:auto}
+  .category-heading{align-items:flex-start}
+  .category-heading>div{min-width:0}
+  .category-heading h2{overflow-wrap:anywhere}
+}
+
+/* Customer cards: prevent chips and long names from colliding with content. */
+.customer-card{min-width:0}
+.customer-card-content,.management-card-head{min-width:0}
+.customer-card h3{overflow-wrap:anywhere;line-height:1.15}
+.customer-card .actions{margin-top:10px}
+@media(max-width:430px){
+  .customer-card{grid-template-columns:52px minmax(0,1fr);gap:10px;padding:12px}
+  .customer-avatar{width:52px;height:52px}
+  .customer-card .actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .customer-card .actions button{width:100%;min-width:0}
+}
+
+/* Keep fixed action buttons above the nav without covering card actions. */
+.fab,.new-order-fab{bottom:calc(92px + env(safe-area-inset-bottom))}
