@@ -1,27 +1,13 @@
-/* V9.0.13 — one visible build version everywhere, sourced from the runtime build. */
+/* V9.0.21 — lightweight build label. No page-wide DOM observer. */
 (function(){
-  const BUILD=String(window.VU_BUILD||'V9.0.13');
-  window.VU_BUILD=BUILD;
-  const legacy=/\b(?:1\.0\s+Alpha\s+7\.\d+\.\d+|2\.0\s+Version\s+8\.\d+\.\d+|V?8\.\d+\.\d+|V?9\.0\.\d+)\b/g;
-  function replaceTextNode(node){
-    if(!node||node.nodeType!==Node.TEXT_NODE)return;
-    const next=(node.nodeValue||'').replace(legacy,BUILD);
-    if(next!==node.nodeValue)node.nodeValue=next;
-  }
-  function sweep(root=document.body){
-    if(!root)return;
-    if(root.nodeType===Node.TEXT_NODE)return replaceTextNode(root);
-    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
-    let n;while((n=walker.nextNode()))replaceTextNode(n);
-    const runtime=document.getElementById('runtimeBuild');if(runtime)runtime.textContent=BUILD;
-  }
-  const observer=new MutationObserver(records=>{
-    for(const r of records){
-      if(r.type==='characterData')replaceTextNode(r.target);
-      for(const n of r.addedNodes||[])sweep(n);
-    }
-    const runtime=document.getElementById('runtimeBuild');if(runtime&&runtime.textContent!==BUILD)runtime.textContent=BUILD;
-  });
-  observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true});
-  sweep();
+'use strict';
+const BUILD=String(window.VU_BUILD||'V9.0.21');
+window.VU_BUILD=BUILD;
+function applyBuildLabel(){
+  const runtime=document.getElementById('runtimeBuild');
+  if(runtime)runtime.textContent=BUILD;
+  document.querySelectorAll('[data-vu-build]').forEach(el=>el.textContent=BUILD);
+}
+applyBuildLabel();
+window.VUApplyBuildLabel=applyBuildLabel;
 })();
