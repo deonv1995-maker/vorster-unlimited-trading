@@ -1,5 +1,6 @@
-/* Version 8 workflow bootstrap: one confirmed-order entry rule for the production pipeline. */
-const VU_WORKFLOW_VERSION='8.0.1';
+/* V9.0.22 — confirmed-order workflow bridge.
+   Kept for explicit workflow builds, but no longer scans/writes every order at app startup. */
+const VU_WORKFLOW_VERSION='9.0.22';
 
 async function syncConfirmedOrdersToProductionV8(){
   const orders=await getAll('orders');
@@ -33,12 +34,3 @@ if(typeof buildIntegratedWorkflow==='function'){
 }
 
 window.syncConfirmedOrdersToProduction=syncConfirmedOrdersToProductionV8;
-
-(async()=>{
-  try{
-    const changed=await syncConfirmedOrdersToProductionV8();
-    if(changed&&typeof route!=='undefined'&&route==='dashboard'&&typeof dashboard==='function')await dashboard();
-  }catch(error){
-    console.warn('Confirmed-order workflow startup failed',error);
-  }
-})();
