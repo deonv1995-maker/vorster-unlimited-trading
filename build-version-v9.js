@@ -1,6 +1,6 @@
-/* V9.0.11 — one visible build version everywhere in the app. */
+/* V9.0.13 — one visible build version everywhere, sourced from the runtime build. */
 (function(){
-  const BUILD='V9.0.11';
+  const BUILD=String(window.VU_BUILD||'V9.0.13');
   window.VU_BUILD=BUILD;
   const legacy=/\b(?:1\.0\s+Alpha\s+7\.\d+\.\d+|2\.0\s+Version\s+8\.\d+\.\d+|V?8\.\d+\.\d+|V?9\.0\.\d+)\b/g;
   function replaceTextNode(node){
