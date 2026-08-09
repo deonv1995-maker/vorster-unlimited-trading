@@ -1,0 +1,1 @@
+This late-loaded recovery layer exists because some Sage PDF rows can be joined so that Sales Rep: DEON is parsed as the customer identity. It uses the malformed imported customer's own VAT/profile data to recover the existing Sage-coded customer, then restores code-authoritative ownership.
