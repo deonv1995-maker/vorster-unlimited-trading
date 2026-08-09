@@ -1,0 +1,1 @@
+Sage customer account code is authoritative. VAT is recovery evidence only when a malformed imported customer has lost the real code during PDF row parsing. Address, suburb, and sales-rep text are never customer identity.
