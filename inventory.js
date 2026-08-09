@@ -15,7 +15,18 @@ function inventoryTotalFor(productId,snapshot){
   return (snapshot[productId]||[]).reduce((sum,item)=>sum+Number(item.quantity||0),0);
 }
 
-async function showStockCount(productId){
+async function showStockCount(productId,context={}){
+  const capturedBatchIds=[...document.querySelectorAll("#stockProductList [data-stock-product]")]
+    .filter(row=>row.style.display!=="none")
+    .map(row=>String(row.dataset.stockProduct||""))
+    .filter(Boolean);
+  const batchProductIds=Array.isArray(context.batchProductIds)&&context.batchProductIds.length
+    ? context.batchProductIds.map(String)
+    : capturedBatchIds;
+  const batchIndex=batchProductIds.indexOf(String(productId));
+  const inBatchMode=batchIndex>=0;
+  const nextBatchProductId=inBatchMode?batchProductIds[batchIndex+1]||"":"";
+
   const [product,balances]=await Promise.all([
     getOne("products",productId),
     getAll("inventoryBalances")
@@ -30,10 +41,11 @@ async function showStockCount(productId){
   const colours=[...(configured.length?configured:[{name:"Standard",hex:"#cccccc"}]),...savedOnly];
   const uniqueColours=colours.filter((colour,index,list)=>list.findIndex(c=>c.name.toLowerCase()===colour.name.toLowerCase())===index);
   const currentByColour=Object.fromEntries(saved.map(item=>[String(item.colourName||"Standard").toLowerCase(),Number(item.quantity||0)]));
+  const progressText=inBatchMode?` · ${batchIndex+1} of ${batchProductIds.length}`:"";
 
   openDialog(`
-    <div class="dialog-head"><div><div class="step-label">Stock on hand</div><h2>${esc(product.code)} · ${esc(product.name)}</h2></div><button class="close-btn" onclick="closeDialog()">×</button></div>
-    <p class="muted">Enter the physical quantity currently counted for each colour. Saving creates an inventory transaction and keeps the previous count in the history.</p>
+    <div class="dialog-head"><div><div class="step-label">Stock on hand${progressText}</div><h2>${esc(product.code)} · ${esc(product.name)}</h2></div><button class="close-btn" onclick="closeDialog()">×</button></div>
+    <p class="muted">Enter the physical quantity currently counted for each colour. Saving creates an inventory transaction and keeps the previous count in the history.${inBatchMode?" Save will move straight to the next product.":""}</p>
     <form id="stockCountForm">
       <div class="stock-count-list">
         ${uniqueColours.map((colour,index)=>{
@@ -45,52 +57,92 @@ async function showStockCount(productId){
         }).join("")}
       </div>
       <label>Stock-count note<textarea name="note" placeholder="Example: Opening count, weekly stocktake or correction"></textarea></label>
-      <button class="primary" type="submit">Save stock on hand</button>
+      <button class="primary" type="submit">${inBatchMode?(nextBatchProductId?"Save & next product":"Save & finish"):"Save stock on hand"}</button>
+      ${inBatchMode?'<button id="finishStockCount" class="ghost" type="button">Finish stock count</button>':""}
     </form>
     <div class="stock-history-link"><button id="viewStockHistory" class="ghost" type="button">View stock history</button></div>
   `);
 
+  const firstQuantityInput=document.querySelector('#stockCountForm input[data-colour]');
+  requestAnimationFrame(()=>{
+    if(firstQuantityInput){
+      firstQuantityInput.focus({preventScroll:true});
+      firstQuantityInput.select();
+    }
+  });
+
   document.getElementById("stockCountForm").onsubmit=async event=>{
     event.preventDefault();
     const form=event.target;
+    const submitButton=form.querySelector('button[type="submit"]');
+    if(submitButton)submitButton.disabled=true;
     const note=new FormData(form).get("note")?.trim()||"Manual stock count";
     const now=new Date().toISOString();
     const inputs=[...form.querySelectorAll("input[data-colour]")];
-    for(const input of inputs){
-      const colourName=input.dataset.colour||"Standard";
-      const newQuantity=Math.max(0,Math.round(Number(input.value||0)));
-      const id=inventoryBalanceId(product.id,colourName);
-      const previous=await getOne("inventoryBalances",id);
-      const previousQuantity=Number(previous?.quantity||0);
-      await putOne("inventoryBalances",{
-        id,
-        productId:product.id,
-        productCode:product.code,
-        productName:product.name,
-        colourName,
-        quantity:newQuantity,
-        updatedAt:now
-      });
-      if(previousQuantity!==newQuantity){
-        await putOne("inventoryTransactions",{
-          id:uid("inv"),
+    try{
+      for(const input of inputs){
+        const colourName=input.dataset.colour||"Standard";
+        const newQuantity=Math.max(0,Math.round(Number(input.value||0)));
+        const id=inventoryBalanceId(product.id,colourName);
+        const previous=await getOne("inventoryBalances",id);
+        const previousQuantity=Number(previous?.quantity||0);
+        await putOne("inventoryBalances",{
+          id,
           productId:product.id,
           productCode:product.code,
           productName:product.name,
           colourName,
-          type:"STOCK_COUNT",
-          previousQuantity,
-          quantityChange:newQuantity-previousQuantity,
-          newQuantity,
-          note,
-          createdAt:now
+          quantity:newQuantity,
+          updatedAt:now
         });
+        if(previousQuantity!==newQuantity){
+          await putOne("inventoryTransactions",{
+            id:uid("inv"),
+            productId:product.id,
+            productCode:product.code,
+            productName:product.name,
+            colourName,
+            type:"STOCK_COUNT",
+            previousQuantity,
+            quantityChange:newQuantity-previousQuantity,
+            newQuantity,
+            note,
+            createdAt:now
+          });
+        }
       }
+
+      notify(nextBatchProductId?`${product.code} saved · next product`:`${product.code} stock saved`);
+
+      if(inBatchMode){
+        if(nextBatchProductId){
+          await showStockCount(nextBatchProductId,{batchProductIds});
+          return;
+        }
+        closeDialog();
+        notify("Stock count finished");
+        if(route==="products")await productsPage();
+        return;
+      }
+
+      closeDialog();
+      if(route==="products")await productsPage();
+    }catch(error){
+      console.error("Stock count save failed",error);
+      notify("Could not save stock count");
+      if(submitButton)submitButton.disabled=false;
     }
-    closeDialog();
-    notify("Stock on hand updated");
-    if(route==="products")await productsPage();
   };
+
+  const finishButton=document.getElementById("finishStockCount");
+  if(finishButton){
+    finishButton.onclick=async()=>{
+      closeDialog();
+      notify("Stock count finished");
+      if(route==="products")await productsPage();
+    };
+  }
+
   document.getElementById("viewStockHistory").onclick=()=>showStockHistory(product.id);
 }
 
