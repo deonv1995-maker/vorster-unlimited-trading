@@ -1,4 +1,4 @@
-/* Version 9.0.1 — predictive target-aware workflow forecast using live stock allocation. */
+/* Version 9.0.3 — predictive target-aware workflow forecast with factory working calendar. */
 (function(){
 'use strict';
 const CLOSED=new Set(['cancelled','delivered','collected','completed','invoiced']);
@@ -11,7 +11,29 @@ const display=v=>new Intl.DateTimeFormat('en-ZA',{weekday:'long',day:'numeric',m
 const isProduct=l=>!window.VUOrderLineClassifications||window.VUOrderLineClassifications.isProduct(l);
 const colour=l=>l?.colour?.name||l?.colourName||'Standard';
 const targetValue=()=>typeof vuDailyInvoiceTarget==='function'?n(vuDailyInvoiceTarget()):n(localStorage.getItem('vu-daily-invoice-target'));
-function nextWorkday(v,steps=1){const d=new Date(`${dk(v)}T12:00:00`);let moved=0;while(moved<steps){d.setDate(d.getDate()+1);if(![0,6].includes(d.getDay()))moved++}return dk(d)}
+
+function easterSunday(year){
+  const a=year%19,b=Math.floor(year/100),c=year%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),month=Math.floor((h+l-7*m+114)/31),day=((h+l-7*m+114)%31)+1;
+  return new Date(year,month-1,day,12);
+}
+function addCalendarDays(date,days){const d=new Date(date);d.setDate(d.getDate()+days);return d}
+function publicHolidaySet(year){
+  const dates=new Set([`${year}-01-01`,`${year}-03-21`,`${year}-04-27`,`${year}-05-01`,`${year}-06-16`,`${year}-08-09`,`${year}-09-24`,`${year}-12-16`,`${year}-12-25`,`${year}-12-26`]);
+  const easter=easterSunday(year);dates.add(dk(addCalendarDays(easter,-2)));dates.add(dk(addCalendarDays(easter,1)));
+  for(const date of [...dates]){const d=new Date(`${date}T12:00:00`);if(d.getDay()===0)dates.add(dk(addCalendarDays(d,1)))}
+  return dates;
+}
+function customClosureSet(){
+  try{const raw=JSON.parse(localStorage.getItem('vu-factory-closures')||'[]');return new Set(Array.isArray(raw)?raw.map(dk):[])}catch{return new Set()}
+}
+function factoryDayInfo(value){
+  const date=dk(value),d=new Date(`${date}T12:00:00`),weekend=[0,6].includes(d.getDay()),holiday=publicHolidaySet(d.getFullYear()).has(date),closure=customClosureSet().has(date);
+  return{date,working:!weekend&&!holiday&&!closure,weekend,holiday,closure};
+}
+function workdayOnOrAfter(v){let d=new Date(`${dk(v)}T12:00:00`);while(!factoryDayInfo(d).working)d.setDate(d.getDate()+1);return dk(d)}
+function nextWorkday(v,steps=1){let d=new Date(`${dk(v)}T12:00:00`),moved=0;while(moved<steps){d.setDate(d.getDate()+1);if(factoryDayInfo(d).working)moved++}return dk(d)}
+window.VUFactoryCalendar={isWorkingDay:v=>factoryDayInfo(v).working,dayInfo:factoryDayInfo,onOrAfter:workdayOnOrAfter,nextWorkingDay:nextWorkday,publicHolidays:year=>[...publicHolidaySet(Number(year))].sort()};
+
 function stageOf(o){const wf=norm(o.workflowStage),fs=norm(o.finishingStatus),ps=norm(o.paintingStatus);if(['delivery','delivery-scheduled'].includes(wf)||ps==='completed')return'delivery';if(wf==='painting'||fs==='completed')return'painting';if(wf==='finishing'||o.rawIssued===true)return'finishing';return'production'}
 function stageRank(s){return{delivery:0,painting:1,finishing:2,production:3}[s]??4}
 function dueSort(a,b){const da=a.dueDate||'9999-12-31',db=b.dueDate||'9999-12-31';return da.localeCompare(db)||new Date(a.createdAt||0)-new Date(b.createdAt||0)}
@@ -19,10 +41,10 @@ function area(o,c){return String(o?.deliveryArea||o?.area||c?.deliveryArea||c?.a
 function lineUnits(o){return(o.lines||[]).filter(l=>isProduct(l)&&n(l.qty)>0).reduce((s,l)=>s+n(l.qty),0)}
 function stockCoverage(o,stock){let required=0,covered=0;const local=new Map(stock);for(const l of(o.lines||[]).filter(x=>isProduct(x)&&n(x.qty)>0)){const q=n(l.qty);required+=q;const pid=l.productId;let avail=n(local.get(pid));const use=Math.min(avail,q);covered+=use;local.set(pid,avail-use)}return required?covered/required:0}
 function allocateStock(order,stock){let required=0,covered=0;const lines=[];for(const l of(order.lines||[]).filter(x=>isProduct(x)&&n(x.qty)>0)){const q=n(l.qty),pid=l.productId;required+=q;const avail=n(stock.get(pid)),use=Math.min(avail,q);stock.set(pid,avail-use);covered+=use;lines.push({line:l,required:q,stockAllocated:use,toMake:q-use})}return{required,covered,toMake:Math.max(0,required-covered),coverage:required?covered/required:1,lines}}
-function actualDate(o,field,fallback){return o?.[field]?dk(o[field]):fallback}
+function actualDate(o,field,fallback){return workdayOnOrAfter(o?.[field]?dk(o[field]):fallback)}
 
 async function buildWorkflowForecast(selected){
-  const date=dk(selected||new Date()),today=dk(new Date());
+  const today=workdayOnOrAfter(new Date()),date=workdayOnOrAfter(selected||today);
   const [orders,customers,balances,products,deliveries]=await Promise.all([getAll('orders'),getAll('customers'),getAll('inventoryBalances'),getAll('products'),getAll('deliveries')]);
   const customerById=new Map(customers.map(c=>[c.id,c])),productById=new Map(products.map(p=>[p.id,p]));
   const stock=new Map();for(const b of balances){if(n(b.quantity)<=0)continue;stock.set(b.productId,n(stock.get(b.productId))+n(b.quantity))}
@@ -33,7 +55,7 @@ async function buildWorkflowForecast(selected){
   open.sort((a,b)=>(basketSet.has(b.order.id)?1:0)-(basketSet.has(a.order.id)?1:0)||stageRank(a.stage)-stageRank(b.stage)||b.coverage-a.coverage||dueSort(a.order,b.order));
   const allocation=new Map();for(const r of open)allocation.set(r.order.id,allocateStock(r.order,stock));
   const capacityState=new Map();
-  function scheduleProduction(order,alloc){let last=today;const byDate=new Map();for(const x of alloc.lines){if(x.toMake<=0)continue;const p=productById.get(x.line.productId);const daily=Math.max(0,Math.round(n(p?.dailyCapacity)));let rem=x.toMake,day=today;if(daily<=0){last='9999-12-31';continue}while(rem>0){const used=n(capacityState.get(`${x.line.productId}|${day}`));const left=Math.max(0,daily-used);if(left<=0){day=nextWorkday(day);continue}const qty=Math.min(left,rem);capacityState.set(`${x.line.productId}|${day}`,used+qty);if(!byDate.has(day))byDate.set(day,[]);byDate.get(day).push({productId:x.line.productId,productCode:x.line.productCode||p?.code||'',productName:x.line.productName||p?.name||'',colourName:colour(x.line),quantity:qty,dailyCapacity:daily,mouldQuantity:n(p?.mouldQuantity)});rem-=qty;last=day;if(rem>0)day=nextWorkday(day)}}return{last,byDate}}
+  function scheduleProduction(order,alloc){let last=today;const byDate=new Map();for(const x of alloc.lines){if(x.toMake<=0)continue;const p=productById.get(x.line.productId);const daily=Math.max(0,Math.round(n(p?.dailyCapacity)));let rem=x.toMake,day=today;if(daily<=0){last='9999-12-31';continue}while(rem>0){day=workdayOnOrAfter(day);const used=n(capacityState.get(`${x.line.productId}|${day}`));const left=Math.max(0,daily-used);if(left<=0){day=nextWorkday(day);continue}const qty=Math.min(left,rem);capacityState.set(`${x.line.productId}|${day}`,used+qty);if(!byDate.has(day))byDate.set(day,[]);byDate.get(day).push({productId:x.line.productId,productCode:x.line.productCode||p?.code||'',productName:x.line.productName||p?.name||'',colourName:colour(x.line),quantity:qty,dailyCapacity:daily,mouldQuantity:n(p?.mouldQuantity)});rem-=qty;last=day;if(rem>0)day=nextWorkday(day)}}return{last,byDate}}
   const rows=[];const productionByDate=new Map();
   for(const r of open){const o=r.order,c=customerById.get(o.customerId),actual=r.stage,alloc=allocation.get(o.id);let rawReady=today,finishDate=today,paintDate=today,deliveryDate=today,prod=null;
     if(actual==='production'){
@@ -41,7 +63,7 @@ async function buildWorkflowForecast(selected){
       finishDate=nextWorkday(rawReady);paintDate=nextWorkday(finishDate);deliveryDate=nextWorkday(paintDate);
     }else if(actual==='finishing'){finishDate=actualDate(o,'finishingStartedAt',today);paintDate=nextWorkday(date>today?today:finishDate);deliveryDate=nextWorkday(paintDate)}
     else if(actual==='painting'){paintDate=actualDate(o,'paintingStartedAt',today);deliveryDate=nextWorkday(date>today?today:paintDate)}
-    else{deliveryDate=o.deliveryDate?dk(o.deliveryDate):today}
+    else{deliveryDate=o.deliveryDate?workdayOnOrAfter(o.deliveryDate):today}
     let predicted=actual;
     if(actual==='production'){if(date>=deliveryDate)predicted='delivery';else if(date>=paintDate)predicted='painting';else if(date>=finishDate)predicted='finishing';else predicted='production'}
     if(actual==='finishing'){if(date>=deliveryDate)predicted='delivery';else if(date>=paintDate)predicted='painting';else predicted='finishing'}
@@ -50,9 +72,9 @@ async function buildWorkflowForecast(selected){
   }
   const groups={production:[],finishing:[],painting:[],delivery:[]};for(const r of rows)groups[r.predictedStage].push(r);
   const prodItems=productionByDate.get(date)||[];
-  const explicit=new Set();for(const d of deliveries){if(dk(d.deliveryDate)===date&&!['delivered','cancelled'].includes(norm(d.status)))explicit.add(d.orderId)}for(const r of groups.delivery){if(r.order.deliveryDate&&dk(r.order.deliveryDate)===date)explicit.add(r.order.id)}
+  const explicit=new Set();for(const d of deliveries){if(workdayOnOrAfter(d.deliveryDate)===date&&!['delivered','cancelled'].includes(norm(d.status)))explicit.add(d.orderId)}for(const r of groups.delivery){if(r.order.deliveryDate&&workdayOnOrAfter(r.order.deliveryDate)===date)explicit.add(r.order.id)}
   const delivery=[];let deliveryValue=0;for(const r of groups.delivery.filter(r=>explicit.has(r.order.id))){delivery.push({...r,explicit:true});deliveryValue+=n(r.order.grandTotal)}
-  const candidates=groups.delivery.filter(r=>!explicit.has(r.order.id)&&(!r.order.deliveryDate||dk(r.order.deliveryDate)>=date));
+  const candidates=groups.delivery.filter(r=>!explicit.has(r.order.id)&&(!r.order.deliveryDate||workdayOnOrAfter(r.order.deliveryDate)>=date));
   if(target<=0){for(const r of candidates){delivery.push({...r,explicit:false});deliveryValue+=n(r.order.grandTotal)}}else if(deliveryValue<target){for(const r of candidates){delivery.push({...r,explicit:false});deliveryValue+=n(r.order.grandTotal);if(deliveryValue>=target)break}}
   return{date,today,target,basketValue,targetState:{gap:Math.max(0,target-basketValue),surplus:Math.max(0,basketValue-target),ok:target>0&&basketValue>=target},deliveryValue,deliveryState:{gap:Math.max(0,target-deliveryValue),surplus:Math.max(0,deliveryValue-target),ok:target>0&&deliveryValue>=target},productionItems:prodItems,production:groups.production,finishing:groups.finishing,painting:groups.painting,deliveryReady:groups.delivery,delivery,rows};
 }
@@ -72,8 +94,8 @@ window.opPrint=forecastPrint;
 const previousProductionPage=productionPage;
 productionPage=async function(){
   const initial=await buildWorkflowForecast(new Date());pageTitle.textContent='Operations';backBtn.classList.add('hidden');if(typeof navState==='function')navState('production');
-  const render=async(stage,date)=>{const p=await buildWorkflowForecast(date),root=document.getElementById('opRoot');if(!root)return;const rows=stage==='production'?productionRows(p):stage==='finishing'?(p.finishing.map((r,i)=>orderCard(r,'finishing',i)).join('')||'<div class="card op-empty">No finishing work is forecast for this date.</div>'):stage==='painting'?(p.painting.map((r,i)=>orderCard(r,'painting',i)).join('')||'<div class="card op-empty">No painting work is forecast for this date.</div>'):deliveryRows(p);root.innerHTML=`${targetPanel(p,stage==='delivery'?p.deliveryValue:p.basketValue,stage==='delivery'?p.deliveryState:p.targetState)}<div class="op-stage-kpis"><div><small>Production</small><strong>${p.production.length}</strong></div><div><small>Finishing</small><strong>${p.finishing.length}</strong></div><div><small>Painting</small><strong>${p.painting.length}</strong></div><div><small>Delivery ready</small><strong>${p.deliveryReady.length}</strong></div></div><div class="op-note"><b>Forecast mode:</b> stock on hand is virtually allocated to the orders that best help cover the daily target first. Remaining shortages are pushed through production, then projected into finishing, painting and delivery on following working days.</div><div class="op-tabs"><button data-stage="production">Production</button><button data-stage="finishing">Finishing</button><button data-stage="painting">Painting</button><button data-stage="delivery">Delivery</button></div><div class="section-head"><div><h2>${stage[0].toUpperCase()+stage.slice(1)} · ${safe(display(p.date))}</h2><p class="muted">Future dates are predictions only; no stock or order status is changed until you record real work.</p></div></div>${rows}<div class="actions"><button onclick="opPrint('${stage}','${p.date}')">Print ${stage} worksheet</button>${stage==='delivery'&&typeof opApplyDeliveryPlan==='function'?`<button class="primary" onclick="opApplyDeliveryPlan('${p.date}')">Apply suggested delivery plan</button>`:''}</div>`;root.querySelectorAll('[data-stage]').forEach(b=>{b.classList.toggle('active',b.dataset.stage===stage);b.onclick=()=>render(b.dataset.stage,p.date)});const input=document.getElementById('opDate');if(input){input.value=p.date;input.onchange=e=>render(stage,e.target.value)}};
-  main.innerHTML=`<section class="card"><div class="section-head"><div><div class="step-label">Unified operations planner · V9.0.1</div><h2>Production → Finishing → Painting → Delivery</h2><p class="muted">Live operational planning plus forward prediction from stock, capacity, order value and the daily invoice target.</p></div></div><label>Work date<input id="opDate" type="date" value="${initial.date}"></label><div class="op-toolbar"><button onclick="document.getElementById('opDate').value='${nextWorkday(initial.date)}';document.getElementById('opDate').dispatchEvent(new Event('change'))">Tomorrow forecast</button><button class="primary" onclick="opPrint('all',document.getElementById('opDate').value)">Print all 4 worksheets / Save PDF</button><button onclick="openOrderCompletionSchedule()">Completion schedule</button></div></section><div id="opRoot"></div>`;
+  const render=async(stage,date)=>{const requested=dk(date),p=await buildWorkflowForecast(date),root=document.getElementById('opRoot');if(!root)return;const rows=stage==='production'?productionRows(p):stage==='finishing'?(p.finishing.map((r,i)=>orderCard(r,'finishing',i)).join('')||'<div class="card op-empty">No finishing work is forecast for this date.</div>'):stage==='painting'?(p.painting.map((r,i)=>orderCard(r,'painting',i)).join('')||'<div class="card op-empty">No painting work is forecast for this date.</div>'):deliveryRows(p);const moved=requested!==p.date?`<div class="op-note"><b>Factory closed ${safe(display(requested))}.</b> Plan moved to the next operating day: ${safe(display(p.date))}.</div>`:'';root.innerHTML=`${moved}${targetPanel(p,stage==='delivery'?p.deliveryValue:p.basketValue,stage==='delivery'?p.deliveryState:p.targetState)}<div class="op-stage-kpis"><div><small>Production</small><strong>${p.production.length}</strong></div><div><small>Finishing</small><strong>${p.finishing.length}</strong></div><div><small>Painting</small><strong>${p.painting.length}</strong></div><div><small>Delivery ready</small><strong>${p.deliveryReady.length}</strong></div></div><div class="op-note"><b>Forecast mode:</b> stock on hand is virtually allocated to the orders that best help cover the daily target first. Factory capacity runs Monday–Friday only and excludes South African public holidays and saved factory closure dates.</div><div class="op-tabs"><button data-stage="production">Production</button><button data-stage="finishing">Finishing</button><button data-stage="painting">Painting</button><button data-stage="delivery">Delivery</button></div><div class="section-head"><div><h2>${stage[0].toUpperCase()+stage.slice(1)} · ${safe(display(p.date))}</h2><p class="muted">Future dates are predictions only; no stock or order status is changed until you record real work.</p></div></div>${rows}<div class="actions"><button onclick="opPrint('${stage}','${p.date}')">Print ${stage} worksheet</button>${stage==='delivery'&&typeof opApplyDeliveryPlan==='function'?`<button class="primary" onclick="opApplyDeliveryPlan('${p.date}')">Apply suggested delivery plan</button>`:''}</div>`;root.querySelectorAll('[data-stage]').forEach(b=>{b.classList.toggle('active',b.dataset.stage===stage);b.onclick=()=>render(b.dataset.stage,p.date)});const input=document.getElementById('opDate');if(input){input.value=p.date;input.onchange=e=>render(stage,e.target.value)}};
+  main.innerHTML=`<section class="card"><div class="section-head"><div><div class="step-label">Unified operations planner · V9.0.3</div><h2>Production → Finishing → Painting → Delivery</h2><p class="muted">Live operational planning plus forward prediction from stock, capacity, order value and the daily invoice target.</p></div></div><label>Work date<input id="opDate" type="date" value="${initial.date}"></label><div class="op-toolbar"><button onclick="document.getElementById('opDate').value='${nextWorkday(initial.date)}';document.getElementById('opDate').dispatchEvent(new Event('change'))">Next operating day</button><button class="primary" onclick="opPrint('all',document.getElementById('opDate').value)">Print all 4 worksheets / Save PDF</button><button onclick="openOrderCompletionSchedule()">Completion schedule</button></div></section><div id="opRoot"></div>`;
   await render('production',initial.date);window.scrollTo({top:0,behavior:'smooth'});
 };
 })();
