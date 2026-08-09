@@ -97,4 +97,15 @@
     if(showNotice)notify(changed?`Customer links repaired: ${changed} order${changed===1?'':'s'}`:'No imported customer links needed repair');
     return{relinked:changed};
   };
+
+  if(typeof settingsPage==='function'){
+    const baseSettingsPage=settingsPage;
+    settingsPage=async function(...args){
+      await baseSettingsPage(...args);
+      const btn=document.getElementById('repairImportedCustomerLinksBtn');
+      if(btn)btn.onclick=async()=>{await window.repairImportedCustomerLinks(true);navigate('customers');};
+    };
+  }
+
+  setTimeout(()=>window.repairImportedCustomerLinks(false).catch(err=>console.warn('Startup customer repair failed',err)),0);
 })();
