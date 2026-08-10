@@ -1,6 +1,6 @@
-/* V9.0.37 — deployment freshness guard.
+/* V9.0.38 — deployment freshness guard.
    Ensures an older installed service worker/cache cannot pin the app to a stale build. */
-const VU_SW_BUILD='9.0.37';
+const VU_SW_BUILD='9.0.38';
 
 self.addEventListener('install',event=>{
   self.skipWaiting();
