@@ -1,8 +1,6 @@
-/* V9.0.48 — one final navigation/page authority.
-   Older runtime modules may replace page functions as the app evolves. The original app.js
-   router can retain references to earlier implementations, so this final router deliberately
-   dispatches through window.* every time. This prevents a legacy page rendering first and the
-   current page appearing only after a second navigation. No business data is mutated here. */
+/* V9.0.49 — one final navigation/page authority.
+   Startup is local-first: the current IndexedDB snapshot renders immediately and shared data
+   refreshes in the background. Network/shared-data availability must never block the app shell. */
 (function(){
 'use strict';
 
@@ -16,6 +14,7 @@ const HANDLERS={
 };
 let current='dashboard';
 let dispatching=false;
+let backgroundSyncStarted=false;
 
 function setNav(name){
   document.querySelectorAll('.bottom-nav button[data-route]').forEach(b=>b.classList.toggle('active',b.dataset.route===name));
@@ -41,17 +40,27 @@ window.navigate=authoritativeNavigate;
 try{navigate=authoritativeNavigate}catch{}
 document.querySelectorAll('.bottom-nav button[data-route]').forEach(b=>{b.onclick=()=>authoritativeNavigate(b.dataset.route)});
 
-/* Initial render happens only through the final authority. Shared data gets one chance to finish
-   first; if offline, the current local IndexedDB snapshot still renders normally. */
-window.VUFinalizeInitialPage=async function(){
-  const main=document.getElementById('main');
+function startBackgroundSharedSync(){
+  if(backgroundSyncStarted)return;
+  backgroundSyncStarted=true;
   const shared=window.VUSharedData;
-  if(shared?.enabled?.()){
-    if(main)main.innerHTML='<section class="card"><h2>Refreshing business data…</h2><p class="muted">Checking the shared Vorster Unlimited workspace before opening the dashboard.</p></section>';
-    try{await shared.syncNow({quiet:true});}catch(error){console.warn('Initial shared-data refresh',error)}
-  }
+  if(!shared?.enabled?.()||typeof shared.syncNow!=='function')return;
+
+  Promise.resolve()
+    .then(()=>shared.syncNow({quiet:true}))
+    .then(()=>{
+      /* Only refresh a top-level dashboard that the user is still viewing. Never pull the user
+         away from another page or detail/edit workflow when background sync finishes. */
+      if(current==='dashboard'&&!dispatching) return authoritativeNavigate('dashboard');
+    })
+    .catch(error=>console.warn('Background shared-data refresh',error));
+}
+
+window.VUFinalizeInitialPage=async function(){
+  /* Local-first render: no Supabase/network promise is awaited before opening the app. */
   await authoritativeNavigate('dashboard');
+  startBackgroundSharedSync();
 };
 
-window.VUNavigationAuthority={version:'9.0.48',navigate:authoritativeNavigate,current:()=>current};
+window.VUNavigationAuthority={version:'9.0.49',navigate:authoritativeNavigate,current:()=>current};
 })();
