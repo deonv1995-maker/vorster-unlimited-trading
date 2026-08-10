@@ -1,6 +1,8 @@
-/* V9.0.46 — authoritative page freshness coordinator.
-   Fixes stale/default counts caused by the base page rendering before all late runtime layers load.
-   Also refreshes a visible top-level page after shared cloud records finish writing locally.
+/* V9.0.47 — authoritative page freshness coordinator.
+   The first visible top-level page now waits for the enabled shared-data sync to finish
+   before showing business counts. This prevents stale/default zero values from being shown
+   while the cloud snapshot is still being pulled into IndexedDB.
+   Also refreshes visible top-level pages after later remote writes.
    Does not mutate business records and never refreshes while the user is editing a field/dialog. */
 (function(){
 'use strict';
@@ -8,6 +10,7 @@
 let refreshTimer=null;
 let refreshing=false;
 let remoteWriteSeen=false;
+let initialSyncComplete=false;
 
 const TOP_LEVEL_TITLES={
   dashboard:new Set(['Dashboard']),
@@ -83,12 +86,45 @@ if(typeof window.VUDbRawDelete==='function'&&!window.VUDbRawDelete.__vuFreshness
   window.VUDbRawDelete=wrapped;
 }
 
-/* Called by the script loader only after every runtime module has installed its final wrappers. */
+async function performInitialSharedSync(){
+  if(initialSyncComplete)return;
+  initialSyncComplete=true;
+  const shared=window.VUSharedData;
+  if(!shared?.enabled?.()||typeof shared.syncNow!=='function'||!navigator.onLine)return;
+
+  const appMain=document.getElementById('main');
+  if(appMain){
+    appMain.innerHTML='<section class="card"><div class="section-head"><div><div class="step-label">Shared business data</div><h2>Refreshing business data…</h2><p class="muted">Loading the latest products, customers, orders, production and delivery status before showing totals.</p></div></div></section>';
+  }
+
+  try{
+    const result=await shared.syncNow({quiet:true});
+    /* syncNow can only return busy when another sync was already running. That should be rare
+       during boot, but wait briefly for that pass to settle rather than immediately rendering
+       a stale snapshot. */
+    if(result?.busy){
+      const started=Date.now();
+      while(Date.now()-started<12000){
+        await new Promise(r=>setTimeout(r,180));
+        const retry=await shared.syncNow({quiet:true});
+        if(!retry?.busy)break;
+      }
+    }
+  }catch(error){
+    console.warn('Initial shared-data freshness sync failed; using local snapshot',error);
+  }
+}
+
+/* Called by the script loader only after every runtime module has installed its final wrappers.
+   The cloud sync happens BEFORE the final page render, so users never see temporary zero totals
+   when the current business snapshot is available remotely. */
 window.VUFinalizeInitialPage=async function(){
+  await performInitialSharedSync();
   const routeName=currentRoute();
   if(typeof navigate==='function')await navigate(routeName||'dashboard');
 };
 window.VURefreshVisiblePage=refreshVisibleTopLevel;
+window.VUEnsureInitialSharedData=performInitialSharedSync;
 
 /* If a remote refresh was deferred because a form/dialog was active, retry when it becomes safe. */
 document.addEventListener('visibilitychange',()=>{
