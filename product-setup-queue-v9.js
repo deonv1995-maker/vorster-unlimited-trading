@@ -1,10 +1,10 @@
-/* V9.0.34 — mandatory product setup queue.
+/* V9.0.35 — mandatory product setup queue.
    Keeps existing product records and save flow; adds system-critical completeness validation
    and guides incomplete active products through the existing Edit Product form one by one. */
 (function(){
 'use strict';
 
-const DIVISIONS=new Set(['Casting','Packing','Resin']);
+const DIVISIONS=new Set(['Casting','Packing','Resin','Painting']);
 const STAGES=new Set(['Raw component','Intermediate','Finished sale product']);
 const norm=v=>String(v??'').trim();
 const methodsOf=p=>String(p?.manufacturingMethods||'').split('|').map(x=>x.trim()).filter(Boolean);
