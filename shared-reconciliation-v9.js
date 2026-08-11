@@ -1,7 +1,8 @@
-/* V9.0.66 — self-healing shared-data reconciliation.
+/* V9.0.67 — self-healing shared-data reconciliation.
    Verifies actual local payloads against the shared workspace, not syncMeta alone.
    Protects genuine local edits by pushing the normal outbox first and never overwriting
-   records that still have a pending mutation/conflict. Runs only while visible/online. */
+   records that still have a pending mutation/conflict. UI redraw is deliberately NOT owned
+   here; shared-refresh-v9.js is the single remote-data page refresh authority. */
 (function(){
 'use strict';
 const CFG_KEY='vu-shared-data-config';
@@ -15,23 +16,12 @@ const stable=v=>{try{return JSON.stringify(v??null)}catch{return String(v)}};
 async function saveMeta(store,id,revision,updatedAt,workspaceId){
   return VUDbRawPut('syncMeta',{id:`${store}|${id}`,store,recordId:String(id),revision:Number(revision||0),remoteUpdatedAt:updatedAt||null,workspaceId,updatedAt:new Date().toISOString()});
 }
-async function refreshVisiblePage(){
-  const r=String(window.route||'');
-  try{
-    if(r==='dashboard'&&typeof window.dashboard==='function')await window.dashboard();
-    else if(r==='products'&&typeof window.productsPage==='function')await window.productsPage();
-    else if(r==='customers'&&typeof window.customersPage==='function')await window.customersPage();
-    else if(r==='orders'&&typeof window.ordersPage==='function')await window.ordersPage();
-    else if(r==='quotes'&&typeof window.quotesPage==='function')await window.quotesPage();
-    else if(r==='production'&&typeof window.productionPage==='function')await window.productionPage();
-  }catch(e){console.warn('Shared reconciliation page refresh',e)}
-}
 async function pullAll(){
   const c=config(),s=session();
   if(!enabled()||!navigator.onLine||document.visibilityState!=='visible')return{pulled:0,skippedPending:0};
 
-  // First give any genuine local edits a chance to reach the cloud. If a conflict remains,
-  // its outbox entry will stay present and the reconciliation pass will leave it untouched.
+  /* First preserve genuine edits from this phone. Normal sync may also pull records; its remote
+     writes are observed by the single shared-refresh authority. */
   try{if(window.VUSharedData?.syncNow)await window.VUSharedData.syncNow({quiet:true})}catch(e){console.warn('Pre-reconciliation sync',e)}
 
   const base=String(c.projectUrl||'').replace(/\/$/,'');
@@ -70,7 +60,6 @@ async function pullAll(){
   if(pulled){
     localStorage.setItem('vu-shared-data-last-sync',new Date().toISOString());
     try{window.dispatchEvent(new CustomEvent('vu:shared-reconciled',{detail:{pulled,skippedPending}}))}catch{}
-    await refreshVisiblePage();
   }
   return{pulled,skippedPending};
 }
@@ -80,5 +69,5 @@ window.addEventListener('online',()=>schedule(800));
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')schedule(500)});
 setInterval(()=>{if(document.visibilityState==='visible'&&navigator.onLine&&enabled())reconcile().catch(e=>console.warn('Shared reconciliation interval',e))},15000);
 if(enabled())schedule(2200);
-window.VUSharedReconciliation={version:'9.0.66',reconcile};
+window.VUSharedReconciliation={version:'9.0.67',reconcile};
 })();
