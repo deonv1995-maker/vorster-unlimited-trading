@@ -1,8 +1,7 @@
-/* V9.0.67 — self-healing shared-data reconciliation.
+/* V9.0.68 — self-healing shared-data reconciliation.
    Verifies actual local payloads against the shared workspace, not syncMeta alone.
-   Protects genuine local edits by pushing the normal outbox first and never overwriting
-   records that still have a pending mutation/conflict. UI redraw is deliberately NOT owned
-   here; shared-refresh-v9.js is the single remote-data page refresh authority. */
+   Uses canonical value comparison so harmless JSON object key-order differences do not trigger
+   false rewrites/refreshes. Protects genuine pending edits and never owns page rendering. */
 (function(){
 'use strict';
 const CFG_KEY='vu-shared-data-config';
@@ -12,7 +11,18 @@ let running=false,timer=null;
 const config=()=>{try{return JSON.parse(localStorage.getItem(CFG_KEY)||'{}')}catch{return{}}};
 const session=()=>{try{return JSON.parse(localStorage.getItem(SESSION_KEY)||'null')}catch{return null}};
 const enabled=()=>{const c=config(),s=session();return !!(c.enabled&&c.projectUrl&&c.publishableKey&&c.workspaceId&&s?.access_token)};
-const stable=v=>{try{return JSON.stringify(v??null)}catch{return String(v)}};
+function canonical(value){
+  if(value===undefined)return undefined;
+  if(value===null||typeof value!=='object')return Number.isNaN(value)?null:value;
+  if(Array.isArray(value))return value.map(v=>v===undefined?null:canonical(v));
+  const out={};
+  for(const key of Object.keys(value).sort()){
+    const next=canonical(value[key]);
+    if(next!==undefined)out[key]=next;
+  }
+  return out;
+}
+const stable=v=>{try{return JSON.stringify(canonical(v??null))}catch{return String(v)}};
 async function saveMeta(store,id,revision,updatedAt,workspaceId){
   return VUDbRawPut('syncMeta',{id:`${store}|${id}`,store,recordId:String(id),revision:Number(revision||0),remoteUpdatedAt:updatedAt||null,workspaceId,updatedAt:new Date().toISOString()});
 }
@@ -20,8 +30,8 @@ async function pullAll(){
   const c=config(),s=session();
   if(!enabled()||!navigator.onLine||document.visibilityState!=='visible')return{pulled:0,skippedPending:0};
 
-  /* First preserve genuine edits from this phone. Normal sync may also pull records; its remote
-     writes are observed by the single shared-refresh authority. */
+  /* Preserve genuine edits from this phone first. Any unresolved conflict/pending mutation stays
+     protected and will not be overwritten by reconciliation. */
   try{if(window.VUSharedData?.syncNow)await window.VUSharedData.syncNow({quiet:true})}catch(e){console.warn('Pre-reconciliation sync',e)}
 
   const base=String(c.projectUrl||'').replace(/\/$/,'');
@@ -57,10 +67,7 @@ async function pullAll(){
     const last=rows[rows.length-1];afterUpdatedAt=last.updated_at;afterStore=last.store_name;afterRecord=last.record_id;
   }
   localStorage.setItem('vu-shared-data-last-reconcile',JSON.stringify({at:new Date().toISOString(),pulled,skippedPending}));
-  if(pulled){
-    localStorage.setItem('vu-shared-data-last-sync',new Date().toISOString());
-    try{window.dispatchEvent(new CustomEvent('vu:shared-reconciled',{detail:{pulled,skippedPending}}))}catch{}
-  }
+  if(pulled)localStorage.setItem('vu-shared-data-last-sync',new Date().toISOString());
   return{pulled,skippedPending};
 }
 async function reconcile(){if(running)return{busy:true};running=true;try{return await pullAll()}finally{running=false}}
@@ -69,5 +76,5 @@ window.addEventListener('online',()=>schedule(800));
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')schedule(500)});
 setInterval(()=>{if(document.visibilityState==='visible'&&navigator.onLine&&enabled())reconcile().catch(e=>console.warn('Shared reconciliation interval',e))},15000);
 if(enabled())schedule(2200);
-window.VUSharedReconciliation={version:'9.0.67',reconcile};
+window.VUSharedReconciliation={version:'9.0.68',reconcile,stable};
 })();
