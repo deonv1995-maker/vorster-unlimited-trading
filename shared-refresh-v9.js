@@ -1,7 +1,7 @@
-/* V9.0.68 — single route-aware shared-data UI refresh authority.
+/* V9.0.70 — single route-aware shared-data UI refresh authority.
    Remote writes may update IndexedDB at any time, but a visible top-level page is redrawn only
-   when one of that page's actual data dependencies changed. Detail/edit/dialog workflows are
-   never navigated away from, and bursts of writes are coalesced into one refresh. */
+   when one of that page's actual data dependencies changed. Detail/edit/dialog workflows and
+   the mandatory product setup queue are never navigated away from or redrawn underneath. */
 (function(){
 'use strict';
 let timer=null,refreshing=false,pending=false;
@@ -26,9 +26,10 @@ function route(){
 function editing(){const a=document.activeElement;return !!a&&['INPUT','TEXTAREA','SELECT'].includes(a.tagName);}
 function dialogOpen(){return !!document.querySelector('dialog[open]');}
 function detailOpen(){const back=document.getElementById('backBtn');return !!back&&!back.classList.contains('hidden');}
+function productSetupBusy(){return !!window.VUProductSetupQueue?.isBusy?.();}
 function relevant(r){const deps=DEPS[r]||new Set();return [...dirtyStores].some(store=>deps.has(store));}
 async function refresh(){
-  if(refreshing||document.visibilityState!=='visible'||editing()||dialogOpen()||detailOpen())return false;
+  if(refreshing||document.visibilityState!=='visible'||editing()||dialogOpen()||detailOpen()||productSetupBusy())return false;
   const r=route();
   if(!TOP.has(r)||typeof window.navigate!=='function'){dirtyStores.clear();return true}
   if(!relevant(r)){dirtyStores.clear();return true}
@@ -58,5 +59,6 @@ if(typeof window.VUDbRawDelete==='function'&&!window.VUDbRawDelete.__vuSharedRef
 }
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&pending)schedule();});
 window.addEventListener('focus',()=>{if(pending)schedule();});
-window.VUSharedRefresh={version:'9.0.68',schedule,refresh,dirtyStores};
+window.addEventListener('vu:product-setup-state',event=>{if(!event.detail?.busy&&pending)schedule();});
+window.VUSharedRefresh={version:'9.0.70',schedule,refresh,dirtyStores};
 })();
