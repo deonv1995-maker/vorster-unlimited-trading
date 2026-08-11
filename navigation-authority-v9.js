@@ -1,21 +1,34 @@
-/* V9.0.67 — one final navigation/page authority.
-   Startup is local-first. Shared sync never owns navigation or redraw; remote-data page refresh
-   is handled only by shared-refresh-v9.js. */
+/* V9.0.77 — one serialized navigation/page authority.
+   Only one page renderer may own the DOM at a time. The latest navigation request is queued
+   while a page is rendering. Shared-data refresh uses refreshCurrent() and never fakes navigation. */
 (function(){
 'use strict';
 const TITLES={dashboard:'Dashboard',products:'Products',customers:'Customers',visits:'Order Intelligence',quotes:'Quotes',orders:'Orders',production:'Operations',deliveries:'Deliveries',settings:'Settings'};
 const HANDLERS={dashboard:'dashboard',products:'productsPage',customers:'customersPage',visits:'visitsPage',quotes:'quotesPage',orders:'ordersPage',production:'productionPage',deliveries:'deliveriesPage',settings:'settingsPage'};
-let current='dashboard',dispatching=false,backgroundSyncStarted=false;
+let current='dashboard',dispatching=false,refreshing=false,backgroundSyncStarted=false,pendingRoute='';
 function setNav(name){document.querySelectorAll('.bottom-nav button[data-route]').forEach(b=>b.classList.toggle('active',b.dataset.route===name));}
 function handlerFor(name){const fn=window[HANDLERS[name]];return typeof fn==='function'?fn:null;}
+async function runRoute(name,{refresh=false}={}){
+  const fn=handlerFor(name);if(!fn)throw new Error(`Current page handler is unavailable: ${name}`);
+  if(refresh)refreshing=true;else dispatching=true;
+  try{await fn();}finally{if(refresh)refreshing=false;else dispatching=false;}
+}
 async function authoritativeNavigate(name){
   const next=HANDLERS[name]?name:'dashboard';
-  if(dispatching&&next===current)return;
-  current=next;setNav(next);
+  if(dispatching||refreshing){pendingRoute=next;return false;}
+  current=next;pendingRoute='';setNav(next);
   const back=document.getElementById('backBtn');if(back)back.classList.add('hidden');
   const title=document.getElementById('pageTitle');if(title)title.textContent=TITLES[next]||'Vorster Unlimited Trading';
-  const fn=handlerFor(next);if(!fn)throw new Error(`Current page handler is unavailable: ${next}`);
-  dispatching=true;try{await fn();}finally{dispatching=false;}
+  await runRoute(next);
+  if(pendingRoute){const queued=pendingRoute;pendingRoute='';if(queued!==current)return authoritativeNavigate(queued);}
+  return true;
+}
+async function refreshCurrent(){
+  if(dispatching||refreshing)return false;
+  const name=current;
+  await runRoute(name,{refresh:true});
+  if(pendingRoute){const queued=pendingRoute;pendingRoute='';if(queued!==current)await authoritativeNavigate(queued);}
+  return true;
 }
 window.navigate=authoritativeNavigate;try{navigate=authoritativeNavigate}catch{}
 document.querySelectorAll('.bottom-nav button[data-route]').forEach(b=>{b.onclick=()=>authoritativeNavigate(b.dataset.route)});
@@ -25,5 +38,5 @@ function startBackgroundSharedSync(){
   Promise.resolve().then(()=>shared.syncNow({quiet:true})).catch(error=>console.warn('Background shared-data sync',error));
 }
 window.VUFinalizeInitialPage=async function(){await authoritativeNavigate('dashboard');startBackgroundSharedSync();};
-window.VUNavigationAuthority={version:'9.0.67',navigate:authoritativeNavigate,current:()=>current,isDispatching:()=>dispatching};
+window.VUNavigationAuthority={version:'9.0.77',navigate:authoritativeNavigate,refreshCurrent,current:()=>current,isDispatching:()=>dispatching,isRefreshing:()=>refreshing,isBusy:()=>dispatching||refreshing,pending:()=>pendingRoute};
 })();
