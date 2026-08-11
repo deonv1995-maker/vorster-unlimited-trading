@@ -1,28 +1,18 @@
-/* Version 8 runtime guard: disable legacy service-worker caching without changing app data. */
+/* V9.0.77 — service-worker registration guard.
+   Legacy app.js still attempts an unversioned sw.js registration very early. Ignore only that call.
+   The final loader's versioned sw.js?v=<build> registration is allowed through normally. */
 (function installRuntimeGuard(){
   if(!('serviceWorker' in navigator))return;
-
-  const serviceWorker=navigator.serviceWorker;
-  const originalRegister=serviceWorker.register.bind(serviceWorker);
-
+  const sw=navigator.serviceWorker,original=sw.register.bind(sw);
   try{
-    Object.defineProperty(serviceWorker,'register',{
-      configurable:true,
-      value:async function disabledServiceWorkerRegistration(){
-        console.info('Service-worker registration disabled for Version 8.');
-        return {
-          active:null,
-          installing:null,
-          waiting:null,
-          unregister:async()=>true,
-          update:async()=>undefined,
-          addEventListener:()=>undefined
-        };
+    Object.defineProperty(sw,'register',{configurable:true,value:function guardedRegister(scriptURL,options){
+      const url=String(scriptURL||'');
+      if(url==='sw.js'||url.endsWith('/sw.js')){
+        console.info('Ignored legacy unversioned service-worker registration.');
+        return Promise.resolve({active:null,installing:null,waiting:null,update:async()=>undefined,unregister:async()=>false,addEventListener:()=>undefined});
       }
-    });
-  }catch(error){
-    console.warn('Could not replace service-worker registration; cleaning registrations instead.',error);
-  }
-
-  window.__vuOriginalServiceWorkerRegister=originalRegister;
+      return original(scriptURL,options);
+    }});
+  }catch(error){console.warn('Could not install service-worker registration guard.',error);}
+  window.__vuOriginalServiceWorkerRegister=original;
 })();
