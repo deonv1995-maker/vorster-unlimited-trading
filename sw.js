@@ -1,5 +1,5 @@
-/* V9.0.75 — deployment freshness guard and installed-client takeover. */
-const VU_SW_BUILD='9.0.75';
+/* V9.0.76 — deployment freshness guard and installed-client takeover. */
+const VU_SW_BUILD='9.0.76';
 self.addEventListener('install',event=>{self.skipWaiting();});
 self.addEventListener('activate',event=>{event.waitUntil((async()=>{
   const keys=await caches.keys();
