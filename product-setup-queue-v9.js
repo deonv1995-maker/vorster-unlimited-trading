@@ -1,6 +1,8 @@
-/* V9.0.35 — mandatory product setup queue.
+/* V9.0.70 — mandatory product setup queue with stable opening lock.
    Keeps existing product records and save flow; adds system-critical completeness validation
-   and guides incomplete active products through the existing Edit Product form one by one. */
+   and guides incomplete active products through the existing Edit Product form one by one.
+   The queue now owns a short Products-page stabilization window so cloud/page refreshes cannot
+   redraw Products while the mandatory setup dialog is opening or active. */
 (function(){
 'use strict';
 
@@ -12,6 +14,17 @@ const stockDivisionsOf=p=>String(p?.divisionStockVisibility||'').split('|').map(
 const componentLines=p=>String(p?.manufacturingComponentsSpec||'').split(/\n|,/).map(x=>x.trim()).filter(Boolean);
 let queueOpening=false;
 let queueActiveProductId='';
+let queueTimer=null;
+let productsSettling=false;
+
+function queueBusy(){
+  const dialog=document.getElementById('dialog');
+  return productsSettling||queueOpening||!!queueActiveProductId||!!dialog?.dataset?.productSetupLocked;
+}
+function setProductsSettling(value){
+  productsSettling=!!value;
+  try{window.dispatchEvent(new CustomEvent('vu:product-setup-state',{detail:{busy:queueBusy()}}))}catch{}
+}
 
 function componentModeOf(p){
   if(p?.manufacturingComponentMode==='none'||p?.manufacturingComponentMode==='uses')return p.manufacturingComponentMode;
@@ -63,9 +76,7 @@ function validateComponents(p,products){
   return errors;
 }
 
-function missingFor(p,products){
-  return [...baseMissing(p),...validateComponents(p,products)];
-}
+function missingFor(p,products){return [...baseMissing(p),...validateComponents(p,products)];}
 
 async function incompleteProducts(){
   const products=(await getAll('products')).filter(p=>p.isActive!==false);
@@ -96,14 +107,7 @@ function formSnapshot(form,stored={}){
   const data=Object.fromEntries(new FormData(form));
   const methods=[...form.querySelectorAll('[data-method]:checked')].map(x=>x.dataset.method);
   const visibility=[...form.querySelectorAll('[data-stock-division]:checked')].map(x=>x.dataset.stockDivision);
-  return {
-    ...stored,...data,
-    price:data.price===''?'':Number(data.price),
-    manufacturingMethods:methods.join('|')||data.manufacturingMethods||'',
-    divisionStockVisibility:visibility.join('|')||data.divisionStockVisibility||'',
-    manufacturingComponentMode:data.manufacturingComponentMode||'',
-    manufacturingComponentsSpec:data.manufacturingComponentsSpec||''
-  };
+  return {...stored,...data,price:data.price===''?'':Number(data.price),manufacturingMethods:methods.join('|')||data.manufacturingMethods||'',divisionStockVisibility:visibility.join('|')||data.divisionStockVisibility||'',manufacturingComponentMode:data.manufacturingComponentMode||'',manufacturingComponentsSpec:data.manufacturingComponentsSpec||''};
 }
 
 function addComponentDecision(form,stored){
@@ -113,129 +117,95 @@ function addComponentDecision(form,stored){
   if(!spec)return;
   const mode=componentModeOf(stored);
   const wrap=document.createElement('label');
-  wrap.dataset.componentDecision='1';
-  wrap.className='component-decision';
-  wrap.innerHTML=`Does this product consume another manufactured product?
-    <select name="manufacturingComponentMode" required>
-      <option value="" ${!mode?'selected':''}>Select…</option>
-      <option value="none" ${mode==='none'?'selected':''}>No — it is manufactured directly</option>
-      <option value="uses" ${mode==='uses'?'selected':''}>Yes — it consumes manufactured components</option>
-    </select>
-    <small>This explicit decision lets the production planner distinguish standalone products from dependent products.</small>`;
+  wrap.dataset.componentDecision='1';wrap.className='component-decision';
+  wrap.innerHTML=`Does this product consume another manufactured product?<select name="manufacturingComponentMode" required><option value="" ${!mode?'selected':''}>Select…</option><option value="none" ${mode==='none'?'selected':''}>No — it is manufactured directly</option><option value="uses" ${mode==='uses'?'selected':''}>Yes — it consumes manufactured components</option></select><small>This explicit decision lets the production planner distinguish standalone products from dependent products.</small>`;
   spec.closest('label')?.before(wrap);
   const select=wrap.querySelector('select');
-  const sync=()=>{
-    const uses=select.value==='uses';
-    spec.required=uses;
-    spec.closest('label').style.display=uses?'':'none';
-    if(!uses&&select.value==='none')spec.value='';
-  };
+  const sync=()=>{const uses=select.value==='uses';spec.required=uses;spec.closest('label').style.display=uses?'':'none';if(!uses&&select.value==='none')spec.value='';};
   select.addEventListener('change',sync);sync();
 }
 
 function markLikelyFields(form,missing){
   form.querySelectorAll('.setup-field-error').forEach(x=>x.classList.remove('setup-field-error'));
-  const mappings=[
-    ['Product code','[name="code"]'],['Product name','[name="name"]'],['Category','[name="category"]'],['Valid price','[name="price"]'],
-    ['Primary division','#primaryDivision'],['Allowed production method','[data-method]'],['Primary division must be an allowed method','[data-method]'],
-    ['Inventory stage','[name="inventoryStage"]'],['Valid worksheet division','#worksheetDivision'],['Valid stock-sheet division','[data-stock-division]'],
-    ['Component dependency decision','[name="manufacturingComponentMode"]'],['Components consumed','[name="manufacturingComponentsSpec"]']
-  ];
-  mappings.forEach(([label,selector])=>{if(missing.some(x=>x===label||x.startsWith('Invalid component')||x.startsWith('Component '))){const el=form.querySelector(selector);el?.classList.add('setup-field-error')}});
+  const mappings=[['Product code','[name="code"]'],['Product name','[name="name"]'],['Category','[name="category"]'],['Valid price','[name="price"]'],['Primary division','#primaryDivision'],['Allowed production method','[data-method]'],['Primary division must be an allowed method','[data-method]'],['Inventory stage','[name="inventoryStage"]'],['Valid worksheet division','#worksheetDivision'],['Valid stock-sheet division','[data-stock-division]'],['Component dependency decision','[name="manufacturingComponentMode"]'],['Components consumed','[name="manufacturingComponentsSpec"]']];
+  mappings.forEach(([label,selector])=>{if(missing.some(x=>x===label||x.startsWith('Invalid component')||x.startsWith('Component ')))form.querySelector(selector)?.classList.add('setup-field-error')});
 }
 
 function lockQueueDialog(locked){
-  const dialog=document.getElementById('dialog');
-  if(!dialog)return;
+  const dialog=document.getElementById('dialog');if(!dialog)return;
   if(locked)dialog.dataset.productSetupLocked='1';else delete dialog.dataset.productSetupLocked;
   const close=dialog.querySelector('.close-btn');
   if(close&&locked){close.removeAttribute('onclick');close.onclick=e=>{e.preventDefault();notify('Complete and save this product to continue the setup queue.');};}
+  try{window.dispatchEvent(new CustomEvent('vu:product-setup-state',{detail:{busy:queueBusy()}}))}catch{}
 }
 
 async function decorateProductForm(id,queueContext=null){
-  const form=document.getElementById('productForm');
-  if(!form)return;
-  const stored=id?await getOne('products',id):{};
-  addComponentDecision(form,stored||{});
-  const products=await getAll('products');
-  const current=stored||{};
-  const initialMissing=missingFor(current,products);
-
+  const form=document.getElementById('productForm');if(!form)return;
+  const stored=id?await getOne('products',id):{};addComponentDecision(form,stored||{});
+  const products=await getAll('products');const current=stored||{};const initialMissing=missingFor(current,products);
   if(queueContext){
-    const banner=document.createElement('div');
-    banner.className='product-setup-banner';
+    const banner=document.createElement('div');banner.className='product-setup-banner';
     banner.innerHTML=`<div class="product-setup-progress"><strong>Product setup required</strong><b>${queueContext.position} of ${queueContext.total}</b></div><small>Complete the system information below. This product cannot be skipped while it is incomplete.</small><div class="product-setup-missing">${initialMissing.map(x=>`<span>${String(x).replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]))}</span>`).join('')}</div>`;
-    form.prepend(banner);
-    lockQueueDialog(true);
-    queueActiveProductId=id;
+    form.prepend(banner);queueActiveProductId=id;lockQueueDialog(true);setProductsSettling(false);
   }
-
   form.addEventListener('submit',async event=>{
-    const snapshot=formSnapshot(form,stored||{});
-    const allProducts=await getAll('products');
+    const snapshot=formSnapshot(form,stored||{});const allProducts=await getAll('products');
     if(!id&&!allProducts.some(p=>String(p.id)===String(snapshot.id)))allProducts.push(snapshot);
     const errors=missingFor(snapshot,allProducts);
-    if(errors.length){
-      event.preventDefault();event.stopImmediatePropagation();
-      markLikelyFields(form,errors);
-      const banner=form.querySelector('.product-setup-banner');
-      if(banner){const box=banner.querySelector('.product-setup-missing');if(box)box.innerHTML=errors.map(x=>`<span>${String(x).replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]))}</span>`).join('');}
-      notify(`Complete ${errors.length} required product ${errors.length===1?'field':'fields'}`);
-      return;
-    }
-    lockQueueDialog(false);
-    queueActiveProductId='';
+    if(errors.length){event.preventDefault();event.stopImmediatePropagation();markLikelyFields(form,errors);const banner=form.querySelector('.product-setup-banner');if(banner){const box=banner.querySelector('.product-setup-missing');if(box)box.innerHTML=errors.map(x=>`<span>${String(x).replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]))}</span>`).join('');}notify(`Complete ${errors.length} required product ${errors.length===1?'field':'fields'}`);return;}
+    lockQueueDialog(false);queueActiveProductId='';setProductsSettling(false);
   },true);
 }
 
 async function openNextIncomplete(){
-  if(queueOpening||typeof route==='undefined'||route!=='products')return;
-  if(document.getElementById('dialog')?.open)return;
+  if(queueOpening)return;
+  const currentRoute=window.VUNavigationAuthority?.current?.()||(typeof route!=='undefined'?route:'');
+  if(currentRoute!=='products'){setProductsSettling(false);return;}
+  if(document.getElementById('dialog')?.open){setProductsSettling(false);return;}
   queueOpening=true;
   try{
-    const queue=await incompleteProducts();
-    renderStatus(queue.length);
-    if(!queue.length)return;
+    const queue=await incompleteProducts();renderStatus(queue.length);
+    if(!queue.length){setProductsSettling(false);return;}
     const first=queue[0];
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    const stillProducts=window.VUNavigationAuthority?.current?.()||(typeof route!=='undefined'?route:'');
+    if(stillProducts!=='products'){setProductsSettling(false);return;}
     await window.showProductForm(first.product.id,{productSetupQueue:true,position:1,total:queue.length});
-  }finally{queueOpening=false;}
+  }finally{queueOpening=false;if(!queueActiveProductId)setProductsSettling(false);}
+}
+
+function scheduleQueueOpen(){
+  setProductsSettling(true);clearTimeout(queueTimer);
+  queueTimer=setTimeout(()=>openNextIncomplete().catch(e=>{console.warn('Product setup queue',e);setProductsSettling(false)}),260);
 }
 
 function renderStatus(count){
-  const toolbar=document.querySelector('.product-toolbar-row');
-  if(!toolbar)return;
+  const toolbar=document.querySelector('.product-toolbar-row');if(!toolbar)return;
   let status=document.getElementById('productSetupStatus');
   if(!status){status=document.createElement('div');status.id='productSetupStatus';status.className='product-setup-status';toolbar.insertAdjacentElement('afterend',status);}
   status.textContent=count?`${count} active product${count===1?'':'s'} still need system setup. The setup queue will open them one by one.`:'Product system setup complete — all active products have the required internal classification.';
 }
 
 ensureStyles();
-
 const baseShowProductForm=window.showProductForm||showProductForm;
-window.showProductForm=async function productSetupAwareForm(id='',context={}){
-  await baseShowProductForm(id);
-  const isQueue=Boolean(context?.productSetupQueue);
-  await decorateProductForm(id,isQueue?{position:context.position||1,total:context.total||1}:null);
-};
+window.showProductForm=async function productSetupAwareForm(id='',context={}){await baseShowProductForm(id);const isQueue=Boolean(context?.productSetupQueue);await decorateProductForm(id,isQueue?{position:context.position||1,total:context.total||1}:null);};
 try{showProductForm=window.showProductForm}catch{}
 
 const baseProductsPage=window.productsPage||productsPage;
 window.productsPage=async function productsPageWithSetupQueue(...args){
+  setProductsSettling(true);
   await baseProductsPage(...args);
-  if(typeof route!=='undefined'&&route==='products')setTimeout(()=>openNextIncomplete(),120);
+  const currentRoute=window.VUNavigationAuthority?.current?.()||(typeof route!=='undefined'?route:'');
+  if(currentRoute==='products')scheduleQueueOpen();else setProductsSettling(false);
 };
 try{productsPage=window.productsPage}catch{}
 
-/* Existing backdrop click listener closes dialogs. Stop that only while the mandatory queue is active. */
 const dialog=document.getElementById('dialog');
 if(dialog){
-  dialog.addEventListener('click',event=>{
-    if(dialog.dataset.productSetupLocked==='1'&&event.target===dialog){event.preventDefault();event.stopImmediatePropagation();notify('Complete and save this product to continue the setup queue.');}
-  },true);
-  dialog.addEventListener('cancel',event=>{
-    if(dialog.dataset.productSetupLocked==='1'){event.preventDefault();notify('Complete and save this product to continue the setup queue.');}
-  });
+  dialog.addEventListener('click',event=>{if(dialog.dataset.productSetupLocked==='1'&&event.target===dialog){event.preventDefault();event.stopImmediatePropagation();notify('Complete and save this product to continue the setup queue.');}},true);
+  dialog.addEventListener('cancel',event=>{if(dialog.dataset.productSetupLocked==='1'){event.preventDefault();notify('Complete and save this product to continue the setup queue.');}});
+  dialog.addEventListener('close',()=>{if(!dialog.dataset.productSetupLocked){queueActiveProductId='';setProductsSettling(false);}});
 }
 
-window.VUProductSetupQueue={incompleteProducts,missingFor,openNextIncomplete};
+window.VUProductSetupQueue={incompleteProducts,missingFor,openNextIncomplete,isBusy:queueBusy,version:'9.0.70'};
 })();
