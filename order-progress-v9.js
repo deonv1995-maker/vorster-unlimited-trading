@@ -7,8 +7,9 @@ if(window.VUOrderProgress)return;
 const n=v=>Math.max(0,Number(v||0));
 const norm=v=>String(v||'').trim().toLowerCase();
 const isProduct=l=>!window.VUOrderLineClassifications||window.VUOrderLineClassifications.isProduct(l);
+let cache=null,cacheAt=0,inflight=null;
 function stageOf(o){const wf=norm(o?.workflowStage),fs=norm(o?.finishingStatus),ps=norm(o?.paintingStatus);if(['delivery','delivery-scheduled'].includes(wf)||ps==='completed')return'delivery';if(wf==='painting'||fs==='completed')return'painting';if(wf==='finishing'||o?.rawIssued===true)return'finishing';return'production'}
-async function buildAll(){
+async function calculate(){
   const [orders,jobs,schedule]=await Promise.all([getAll('orders'),getAll('productionJobs'),typeof buildOrderCompletionSchedule==='function'?buildOrderCompletionSchedule():Promise.resolve({orders:[]})]);
   const scheduleByOrder=new Map((schedule?.orders||[]).map(p=>[String(p.order?.id||''),p]));
   const paintedByOrder=new Map();
@@ -25,8 +26,11 @@ async function buildAll(){
     const remainingPaint=painted?.target?Math.max(0,painted.target-painted.done):Math.max(0,required-n(o.paintedQty));
     map.set(String(o.id),{orderId:o.id,percent,stage,rawPct,finishingPct,paintingPct,required,rawReady,remainingPaint,nextAction,deliveryReady:percent>=100});
   }
-  return map;
+  cache=map;cacheAt=Date.now();return map;
 }
+async function buildAll(options={}){if(!options?.fresh&&cache&&Date.now()-cacheAt<2500)return cache;if(inflight&&!options?.fresh)return inflight;inflight=calculate().finally(()=>{inflight=null});return inflight}
 async function one(orderId){return (await buildAll()).get(String(orderId))||null}
-window.VUOrderProgress={version:'9.0.80',buildAll,one,stageOf};
+function invalidate(){cache=null;cacheAt=0}
+window.addEventListener('vu:product-setup-state',invalidate);
+window.VUOrderProgress={version:'9.0.80',buildAll,one,stageOf,invalidate};
 })();
