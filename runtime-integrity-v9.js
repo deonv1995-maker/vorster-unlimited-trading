@@ -1,4 +1,4 @@
-/* V9.0.79 — runtime authority audit. Diagnostic only; never writes business data. */
+/* V9.0.80 — runtime authority audit. Diagnostic only; never writes business data. */
 (function(){
 'use strict';
 const atLeast=(obj,version)=>!!obj&&String(obj.version||'')===version;
@@ -8,6 +8,8 @@ const checks={
   operations:()=>!!window.VUThreeStagePlan,
   orderCommitment:()=>atLeast(window.VUOrderCommitment,'9.0.79'),
   orderCommitmentUI:()=>atLeast(window.VUOrderCommitmentUI,'9.0.79'),
+  orderProgress:()=>atLeast(window.VUOrderProgress,'9.0.80'),
+  guidedControlCenter:()=>atLeast(window.VUGuidedControlCenter,'9.0.80'),
   businessOptimizer:()=>atLeast(window.VUBusinessOutcomeOptimizer,'9.0.79'),
   optimizedSchedule:()=>atLeast(window.VUOptimizedCompletionSchedule,'9.0.78'),
   completionCommitment:()=>atLeast(window.VUCompletionCommitment,'9.0.79'),
@@ -29,5 +31,5 @@ function audit(){
   if(Object.values(status).some(v=>!v))console.warn('Runtime authority missing or stale',status);
   return{build:window.VU_BUILD,status,legacy};
 }
-window.VURuntimeAudit={version:'9.0.79',audit};setTimeout(audit,0);
+window.VURuntimeAudit={version:'9.0.80',audit};setTimeout(audit,0);
 })();
