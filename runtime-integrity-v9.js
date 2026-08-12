@@ -17,7 +17,7 @@ const checks={
   divisionWorksheets:()=>atLeast(window.VUStrictDivisionWorksheets,'9.0.77'),
   divisionStock:()=>!!window.VUStrictDivisionStock,
   paintingCapture:()=>atLeast(window.VUPaintingOrderCapture,'9.0.77'),
-  deliveryLogistics:()=>atLeast(window.VUDeliveryLogisticsPlanner,'9.0.77'),
+  deliveryLogistics:()=>atLeast(window.VUDeliveryLogisticsPlanner,'9.0.79'),
   sharedData:()=>!!window.VUSharedData,
   sharedRefresh:()=>atLeast(window.VUSharedRefresh,'9.0.77'),
   serviceWorkerGuard:()=>typeof window.__vuOriginalServiceWorkerRegister==='function'
