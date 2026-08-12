@@ -2,7 +2,7 @@
 (function(){
 'use strict';
 const base=window.VUBusinessOutcomeOptimizer;if(!base?.build||!window.VUOrderCommitment)return;
-const dk=VUOrderCommitment.dateKey;
+const dk=v=>{if(v instanceof Date&&!Number.isNaN(v.getTime()))return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`;return VUOrderCommitment.dateKey(v)};
 const today=()=>dk(new Date());
 const daysFromToday=value=>{const d=dk(value);if(!d)return 999;return Math.round((new Date(`${d}T12:00:00`)-new Date(`${today()}T12:00:00`))/86400000)};
 async function build(){
