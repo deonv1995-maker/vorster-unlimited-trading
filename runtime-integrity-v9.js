@@ -1,4 +1,4 @@
-/* V9.0.88 — runtime authority audit. Diagnostic only; never writes business data. */
+/* V9.0.89 — runtime authority audit. Diagnostic only; never writes business data. */
 (function(){
 'use strict';
 const exact=(obj,version)=>!!obj&&String(obj.version||'')===version;
@@ -10,11 +10,12 @@ const checks={
   dashboard:()=>present(window.VUDashboardAuthority),
   orderCommitment:()=>present(window.VUOrderCommitment),
   managerPlanPriority:()=>exact(window.VUManagerPlanPriority,'9.0.84'),
-  fulfilmentCalendar:()=>exact(window.VUFulfilmentCalendarStandalone,'9.0.88')&&typeof window.openFulfilmentCalendar==='function',
+  autoFulfilmentPlanner:()=>exact(window.VUAutoFulfilmentPlanner,'9.0.89'),
+  fulfilmentCalendar:()=>exact(window.VUFulfilmentCalendarStandalone,'9.0.89')&&typeof window.openFulfilmentCalendar==='function',
   calendarQuickButton:()=>!!document.getElementById('calendarQuickBtn'),
   orderProgress:()=>exact(window.VUOrderProgress,'9.0.80'),
   guidedControlCenter:()=>exact(window.VUGuidedControlCenter,'9.0.80'),
-  businessOptimizer:()=>exact(window.VUBusinessOutcomeOptimizer,'9.0.84'),
+  businessOptimizer:()=>present(window.VUBusinessOutcomeOptimizer),
   optimizedSchedule:()=>present(window.VUOptimizedCompletionSchedule),
   completionCommitment:()=>present(window.VUCompletionCommitment),
   businessOperations:()=>present(window.VUBusinessOutcomeOperations),
@@ -49,5 +50,5 @@ function audit(){
   if(Object.values(status).some(v=>!v))console.warn('Runtime authority missing or stale',status);
   return{build:window.VU_BUILD,status,legacy,clean:!Object.values(legacy).some(Boolean)&&!Object.values(status).some(v=>!v)};
 }
-window.VURuntimeAudit={version:'9.0.88',audit};setTimeout(audit,0);
+window.VURuntimeAudit={version:'9.0.89',audit};setTimeout(audit,0);
 })();
