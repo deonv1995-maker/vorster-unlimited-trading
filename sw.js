@@ -1,5 +1,5 @@
-/* V9.0.82 — safe freshness guard. No forced navigation of open clients. */
-const VU_SW_BUILD='9.0.82';
+/* V9.0.83 — safe freshness guard. No forced navigation of open clients. */
+const VU_SW_BUILD='9.0.83';
 self.addEventListener('install',event=>{self.skipWaiting();});
 self.addEventListener('activate',event=>{event.waitUntil((async()=>{
   const keys=await caches.keys();
