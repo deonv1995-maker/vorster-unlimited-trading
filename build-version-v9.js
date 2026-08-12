@@ -11,10 +11,10 @@ function applyBuildLabel(){
 function loadOperationalExtension(){
   if(window.VUDailyDispatchCapture||document.querySelector('script[data-vu-daily-dispatch]'))return;
   const s=document.createElement('script');
-  s.src='daily-dispatch-capture-v9.js?v=9.1.00';
+  s.src='daily-dispatch-capture-v9.js?v=9.1.01';
   s.async=false;
   s.dataset.vuDailyDispatch='1';
-  s.onerror=()=>console.error('Could not load Daily Delivery & Collection read-in');
+  s.onerror=()=>console.error('Could not load order-based Delivery & Collection read-in');
   document.body.appendChild(s);
 }
 applyBuildLabel();
