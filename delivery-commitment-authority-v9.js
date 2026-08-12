@@ -1,0 +1,23 @@
+/* V9.0.79 — delivery routing respects order fulfilment commitments.
+   Collection orders never enter the truck route. Future required deliveries are held until their date;
+   missed required delivery dates remain eligible for the next feasible route. */
+(function(){
+'use strict';
+const base=window.VUDeliveryLogisticsPlanner;if(!base?.buildPlan||!window.VUOrderCommitment)return;
+const safe=v=>typeof esc==='function'?esc(v):String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+const dk=VUOrderCommitment.dateKey;
+async function buildPlan(date,locateMissing=false){
+  const routeDate=dk(date||new Date()),rawGetAll=window.getAll;
+  window.getAll=async function(store){const rows=await rawGetAll(store);if(store!=='orders')return rows;return rows.filter(o=>{const c=VUOrderCommitment.commitment(o);if(c.type==='Collection')return false;if(c.hard&&c.type==='Delivery'&&c.date&&c.date>routeDate)return false;return true;});};
+  try{return await base.buildPlan(routeDate,locateMissing);}finally{window.getAll=rawGetAll;}
+}
+async function open(){
+  const dialog=document.getElementById('dialog'),d=new Date();do d.setDate(d.getDate()+1);while([0,6].includes(d.getDay()));const tomorrow=dk(d);
+  dialog.innerHTML=`<div class="modal-form" style="padding:20px;max-height:94vh;overflow:auto"><div class="dialog-head"><div><div class="eyebrow">DELIVERY LOGISTICS</div><h2>Commitment-aware delivery route</h2><p class="muted">Collections are excluded. Future required delivery dates are held back; overdue required deliveries remain eligible.</p></div><button class="close-btn" type="button" data-close>×</button></div><label>Route date<input id="commitRouteDate" type="date" value="${tomorrow}"></label><div class="actions"><button id="commitRouteLocate">Locate missing addresses</button><button class="primary" id="commitRouteBuild">Build route</button></div><div id="commitRouteBody" class="card" style="margin-top:12px"><small class="muted">Build the route to calculate feasible delivery stops.</small></div></div>`;dialog.showModal();dialog.querySelector('[data-close]').onclick=()=>dialog.close();
+  const run=async locate=>{const host=document.getElementById('commitRouteBody');host.innerHTML='<small class="muted">Calculating route…</small>';try{const p=await buildPlan(document.getElementById('commitRouteDate').value,locate),value=(p.route||[]).reduce((s,x)=>s+Number(x.value||0),0);host.innerHTML=`<div class="route-summary"><div><small>Stops</small><strong>${p.route?.length||0}</strong></div><div><small>Distance</small><strong>${Math.round(Number(p.totalKm||0))} km</strong></div><div><small>Source</small><strong style="font-size:.75rem">${safe(p.source||'Route')}</strong></div></div>${(p.route||[]).map((x,i)=>`<div class="route-stop"><small>Stop ${i+1}${x.arrivalMinutes!=null?` · ETA ${String(Math.floor(Math.round(x.arrivalMinutes)/60)%24).padStart(2,'0')}:${String(Math.round(x.arrivalMinutes)%60).padStart(2,'0')}`:''}</small><h3>${safe(x.customer?.name||x.orders?.[0]?.customerName||'Customer')}</h3><small>${safe((x.orders||[]).map(o=>{const c=VUOrderCommitment.commitment(o);return `${o.orderNumber||'Order'}${c.hard&&c.date?` · required ${c.date}`:''}`}).join(' · '))}</small></div>`).join('')}${p.excluded?.length?`<h3>Ready but does not fit</h3>${p.excluded.map(x=>`<div class="route-stop route-warning"><b>${safe(x.customer?.name||'Customer')}</b><small>${safe(x.reason||'Time window')}</small></div>`).join('')}`:''}${p.missing?.length?`<h3>Location needed</h3>${p.missing.map(x=>`<div class="route-stop route-warning"><b>${safe(x.group?.customer?.name||'Customer')}</b><small>${safe(x.reason)}</small></div>`).join('')}`:''}<p class="muted">Planned ready-order value: ${typeof money==='function'?money(value):value}</p><button class="secondary" id="commitRouteAdvanced">Open full route planner settings</button>`;document.getElementById('commitRouteAdvanced').onclick=()=>base.open();}catch(e){host.innerHTML=`<div class="route-warning">${safe(e.message||'Could not build route')}</div>`;}};
+  document.getElementById('commitRouteBuild').onclick=()=>run(false);document.getElementById('commitRouteLocate').onclick=()=>run(true);
+}
+function rebind(){const b=document.querySelector('[data-delivery-logistics]');if(b){b.textContent="Plan tomorrow's route by time, location & commitments";b.onclick=open;}}
+const prod=window.productionPage;if(typeof prod==='function'){window.productionPage=async function(...args){const r=await prod(...args);rebind();return r};try{productionPage=window.productionPage}catch{}}
+window.openDeliveryLogisticsPlanner=open;window.VUDeliveryLogisticsPlanner={...base,version:'9.0.79',buildPlan,open};
+})();
