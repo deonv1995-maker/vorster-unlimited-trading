@@ -1,4 +1,4 @@
-/* V9.0.80 — runtime authority audit. Diagnostic only; never writes business data. */
+/* V9.0.82 — runtime authority audit. Diagnostic only; never writes business data. */
 (function(){
 'use strict';
 const atLeast=(obj,version)=>!!obj&&String(obj.version||'')===version;
@@ -16,12 +16,14 @@ const checks={
   optimizedCalendar:()=>atLeast(window.VUOptimizedCompletionCalendar,'9.0.78'),
   businessOperations:()=>atLeast(window.VUBusinessOutcomeOperations,'9.0.78'),
   manufacturingClassification:()=>!!window.VUManufacturingClassification,
-  divisionWorksheets:()=>atLeast(window.VUStrictDivisionWorksheets,'9.0.77'),
+  divisionWorksheets:()=>!!window.VUStrictDivisionWorksheets,
+  unifiedRawProduction:()=>atLeast(window.VURawProductionUnified,'9.0.82'),
+  dailyFactoryPack:()=>!!window.VUDailyFactoryPack,
   divisionStock:()=>!!window.VUStrictDivisionStock,
-  paintingCapture:()=>atLeast(window.VUPaintingOrderCapture,'9.0.77'),
-  deliveryLogistics:()=>atLeast(window.VUDeliveryLogisticsPlanner,'9.0.79'),
+  paintingCapture:()=>!!window.VUPaintingOrderCapture,
+  deliveryLogistics:()=>!!window.VUDeliveryLogisticsPlanner,
   sharedData:()=>!!window.VUSharedData,
-  sharedRefresh:()=>atLeast(window.VUSharedRefresh,'9.0.77'),
+  sharedRefresh:()=>!!window.VUSharedRefresh,
   serviceWorkerGuard:()=>typeof window.__vuOriginalServiceWorkerRegister==='function'
 };
 function audit(){
@@ -31,5 +33,5 @@ function audit(){
   if(Object.values(status).some(v=>!v))console.warn('Runtime authority missing or stale',status);
   return{build:window.VU_BUILD,status,legacy};
 }
-window.VURuntimeAudit={version:'9.0.80',audit};setTimeout(audit,0);
+window.VURuntimeAudit={version:'9.0.82',audit};setTimeout(audit,0);
 })();
