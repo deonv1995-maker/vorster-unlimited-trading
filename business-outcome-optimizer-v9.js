@@ -15,6 +15,7 @@ const dayDiff=v=>{if(!v)return 999;const a=new Date(`${dateKey(new Date())}T12:0
 const stageOf=o=>{const wf=norm(o?.workflowStage),fs=norm(o?.finishingStatus),ps=norm(o?.paintingStatus);if(['delivery','delivery-scheduled'].includes(wf)||ps==='completed')return'delivery';if(wf==='painting'||fs==='completed')return'painting';if(wf==='finishing'||o?.rawIssued===true)return'finishing';return'production'};
 const target=()=>typeof vuDailyInvoiceTarget==='function'?n(vuDailyInvoiceTarget()):n(localStorage.getItem('vu-daily-invoice-target'));
 const areaOf=(o,c)=>String(o?.deliveryArea||o?.area||c?.deliveryArea||c?.area||c?.suburb||c?.city||c?.location||'Area not set').split(',')[0].trim()||'Area not set';
+const productCost=p=>{for(const v of [p?.unitCost,p?.costPrice,p?.manufacturingCost,p?.cost,p?.averageCost]){const x=Number(v);if(Number.isFinite(x)&&x>0)return x}return null};
 function recentOutput(jobs,days=7){
   const cutoff=new Date();cutoff.setDate(cutoff.getDate()-days);const byProduct=new Map();
   for(const j of jobs){if(j?.kind!=='divisionRawDaily')continue;const dt=new Date(`${j.workDate||dateKey(j.updatedAt)}T12:00:00`);if(Number.isNaN(dt.getTime())||dt<cutoff)continue;const pid=String(j.productId||'');if(!pid)continue;const row=byProduct.get(pid)||{qty:0,days:new Set()};row.qty+=n(j.producedQty||j.completedQty);row.days.add(j.workDate);byProduct.set(pid,row)}
@@ -29,8 +30,14 @@ async function build(){
   const yesterdayOrders=new Set();for(const j of jobs){if((j?.kind==='paintingCaptureSet'||j?.kind==='orderPaintingLine')&&(j.workDate===yesterday||j.lastCapturedDate===yesterday))yesterdayOrders.add(String(j.orderId||''))}
   const active=orders.filter(o=>!CLOSED.has(norm(o.status))&&(o.lines||[]).some(l=>productLine(l)&&n(l.qty)>0));
   const areaStats=new Map();for(const o of active){const a=areaOf(o,customerById.get(String(o.customerId))),r=areaStats.get(a)||{count:0,value:0};r.count++;r.value+=n(o.grandTotal);areaStats.set(a,r)}
-  const dailyTarget=target(),maxValue=Math.max(1,...active.map(o=>n(o.grandTotal)));
-  const rows=active.map(order=>{
+  const dailyTarget=target();
+  const prelim=active.map(order=>{
+    const lines=(order.lines||[]).filter(l=>productLine(l)&&n(l.qty)>0);let contribution=0,costedRevenue=0,knownCostLines=0;
+    for(const l of lines){const p=productById.get(String(l.productId||''))||{},q=n(l.qty),sell=n(l.unitPrice||l.price),cost=productCost(p);if(cost!==null&&sell>0){contribution+=Math.max(0,(sell-cost)*q);costedRevenue+=sell*q;knownCostLines++}}
+    return{order,estimatedContribution:knownCostLines?contribution:n(order.grandTotal),marginDataCoverage:lines.length?knownCostLines/lines.length:0};
+  });
+  const maxEconomic=Math.max(1,...prelim.map(x=>x.estimatedContribution));
+  const rows=prelim.map(({order,estimatedContribution,marginDataCoverage})=>{
     const customer=customerById.get(String(order.customerId)),stage=stageOf(order),lines=(order.lines||[]).filter(l=>productLine(l)&&n(l.qty)>0);
     let required=0,covered=0,effortDays=0,continuityLines=0,noCapacity=0;
     for(const l of lines){const pid=String(l.productId||''),q=n(l.qty),available=n(raw.get(pid)),use=Math.min(q,available),short=Math.max(0,q-use),p=productById.get(pid)||{},historical=n(avgOutput.get(pid)),configured=n(p.dailyCapacity||p.manufacturingCapacityPerDay||p.capacityPerDay),capacity=historical>0?Math.max(historical,configured*.5):configured;required+=q;covered+=use;if(yesterdayProducts.has(pid))continuityLines++;if(short>0){if(capacity>0)effortDays=Math.max(effortDays,short/capacity);else noCapacity++}}
@@ -38,7 +45,9 @@ async function build(){
     let score=0;const reasons=[];
     const stagePts={delivery:42,painting:30,finishing:20,production:0}[stage]||0;score+=stagePts;if(stagePts)reasons.push(`${stage} is close to invoicing`);
     const coveragePts=coverage*32;score+=coveragePts;if(coverage>=.8)reasons.push(`${Math.round(coverage*100)}% raw-stock covered`);
-    const valuePts=(value/maxValue)*22;score+=valuePts;if(dailyTarget>0&&value>=dailyTarget*.35)reasons.push('meaningful contribution to daily target');
+    const economicPts=(estimatedContribution/maxEconomic)*22;score+=economicPts;
+    if(marginDataCoverage>=.5)reasons.push('profit contribution considered');
+    else if(dailyTarget>0&&value>=dailyTarget*.35)reasons.push('meaningful contribution to daily target');
     const urgency=dueDays<=0?28:dueDays<=2?23:dueDays<=5?15:dueDays<=10?7:0;score+=urgency;if(urgency>=15)reasons.push(dueDays<=0?'overdue':'due soon');
     const continuation=(yesterdayOrders.has(String(order.id))?18:0)+Math.min(12,continuityLines*4);score+=continuation;if(continuation)reasons.push('continues yesterday\'s work');
     const routePts=Math.min(12,Math.max(0,(areaStat.count-1)*3));score+=routePts;if(routePts)reasons.push(`${areaStat.count} open orders in ${area}`);
@@ -46,8 +55,8 @@ async function build(){
     const effortPenalty=Math.min(24,effortDays*6);score-=effortPenalty;if(effortDays<=1&&stage==='production')reasons.push('low remaining production effort');
     if(noCapacity){score-=30;reasons.push('capacity information missing')}
     if(norm(order.status)==='confirmed')score+=4;
-    const efficiency=value/Math.max(1,required+effortDays*10);
-    return{orderId:order.id,order,customer,stage,area,score:Number(score.toFixed(2)),coverage,required,covered,effortDays:Number(effortDays.toFixed(2)),value,dueDays,ageDays,efficiency,reasons};
+    const efficiency=estimatedContribution/Math.max(1,required+effortDays*10);
+    return{orderId:order.id,order,customer,stage,area,score:Number(score.toFixed(2)),coverage,required,covered,effortDays:Number(effortDays.toFixed(2)),value,estimatedContribution:Number(estimatedContribution.toFixed(2)),marginDataCoverage,dueDays,ageDays,efficiency,reasons};
   }).sort((a,b)=>b.score-a.score||b.efficiency-a.efficiency||b.value-a.value||new Date(a.order.createdAt||0)-new Date(b.order.createdAt||0));
   rows.forEach((r,i)=>r.priority=i+1);
   const goalValue=dailyTarget||rows.reduce((s,r)=>s+r.value,0);let selectedValue=0;const selected=[];
