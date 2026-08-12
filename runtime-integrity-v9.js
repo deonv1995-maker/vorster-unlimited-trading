@@ -5,6 +5,7 @@ const exact=(obj,version)=>!!obj&&String(obj.version||'')===version;
 const present=obj=>!!obj;
 const checks={
   businessTarget:()=>exact(window.VUBusinessTarget,'9.0.83'),
+  sageDocumentImport:()=>exact(window.VUSageDocumentImport,'9.0.83'),
   navigation:()=>present(window.VUNavigationAuthority),
   dashboard:()=>present(window.VUDashboardAuthority),
   orderCommitment:()=>present(window.VUOrderCommitment),
@@ -26,6 +27,7 @@ const checks={
 const legacyChecks={
   oldOptimizer:()=>typeof window.VU_OPTIMIZER_VERSION!=='undefined'||typeof window.buildOptimizedOrderJobs==='function',
   oldChecklist:()=>typeof window.VU_CHECKLIST_VERSION!=='undefined'||typeof window.vuIssueChecklistOrderToFinishing==='function',
+  oldBusinessPipeline:()=>typeof window.VU_PIPELINE_VERSION!=='undefined'||typeof window.vuMoveFinishedOrderToDelivery==='function',
   oldWorkflowPredictions:()=>typeof window.VU_PREDICTION_VERSION!=='undefined',
   oldPipelineIntelligence:()=>typeof window.VU_PIPELINE_INTELLIGENCE_VERSION!=='undefined'||typeof window.buildPipelineForecast==='function',
   oldCrossStage:()=>typeof window.VU_CROSS_STAGE_VERSION!=='undefined',
