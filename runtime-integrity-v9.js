@@ -1,37 +1,47 @@
-/* V9.0.82 — runtime authority audit. Diagnostic only; never writes business data. */
+/* V9.0.83 — runtime authority audit. Diagnostic only; never writes business data. */
 (function(){
 'use strict';
-const atLeast=(obj,version)=>!!obj&&String(obj.version||'')===version;
+const exact=(obj,version)=>!!obj&&String(obj.version||'')===version;
+const present=obj=>!!obj;
 const checks={
-  navigation:()=>atLeast(window.VUNavigationAuthority,'9.0.77'),
-  dashboard:()=>atLeast(window.VUDashboardAuthority,'9.0.77'),
-  operations:()=>!!window.VUThreeStagePlan,
-  orderCommitment:()=>atLeast(window.VUOrderCommitment,'9.0.79'),
-  orderCommitmentUI:()=>atLeast(window.VUOrderCommitmentUI,'9.0.79'),
-  orderProgress:()=>atLeast(window.VUOrderProgress,'9.0.80'),
-  guidedControlCenter:()=>atLeast(window.VUGuidedControlCenter,'9.0.80'),
-  businessOptimizer:()=>atLeast(window.VUBusinessOutcomeOptimizer,'9.0.79'),
-  optimizedSchedule:()=>atLeast(window.VUOptimizedCompletionSchedule,'9.0.78'),
-  completionCommitment:()=>atLeast(window.VUCompletionCommitment,'9.0.79'),
-  optimizedCalendar:()=>atLeast(window.VUOptimizedCompletionCalendar,'9.0.78'),
-  businessOperations:()=>atLeast(window.VUBusinessOutcomeOperations,'9.0.78'),
-  manufacturingClassification:()=>!!window.VUManufacturingClassification,
-  divisionWorksheets:()=>!!window.VUStrictDivisionWorksheets,
-  unifiedRawProduction:()=>atLeast(window.VURawProductionUnified,'9.0.82'),
-  dailyFactoryPack:()=>!!window.VUDailyFactoryPack,
-  divisionStock:()=>!!window.VUStrictDivisionStock,
-  paintingCapture:()=>!!window.VUPaintingOrderCapture,
-  deliveryLogistics:()=>!!window.VUDeliveryLogisticsPlanner,
-  sharedData:()=>!!window.VUSharedData,
-  sharedRefresh:()=>!!window.VUSharedRefresh,
+  businessTarget:()=>exact(window.VUBusinessTarget,'9.0.83'),
+  navigation:()=>present(window.VUNavigationAuthority),
+  dashboard:()=>present(window.VUDashboardAuthority),
+  orderCommitment:()=>present(window.VUOrderCommitment),
+  orderProgress:()=>exact(window.VUOrderProgress,'9.0.80'),
+  guidedControlCenter:()=>exact(window.VUGuidedControlCenter,'9.0.80'),
+  businessOptimizer:()=>present(window.VUBusinessOutcomeOptimizer),
+  optimizedSchedule:()=>present(window.VUOptimizedCompletionSchedule),
+  completionCommitment:()=>present(window.VUCompletionCommitment),
+  businessOperations:()=>present(window.VUBusinessOutcomeOperations),
+  divisionWorksheets:()=>present(window.VUStrictDivisionWorksheets),
+  unifiedRawProduction:()=>exact(window.VURawProductionUnified,'9.0.82'),
+  dailyFactoryPack:()=>present(window.VUDailyFactoryPack),
+  paintingCapture:()=>present(window.VUPaintingOrderCapture),
+  deliveryLogistics:()=>present(window.VUDeliveryLogisticsPlanner),
+  sharedData:()=>present(window.VUSharedData),
+  sharedRefresh:()=>present(window.VUSharedRefresh),
   serviceWorkerGuard:()=>typeof window.__vuOriginalServiceWorkerRegister==='function'
+};
+const legacyChecks={
+  oldOptimizer:()=>typeof window.VU_OPTIMIZER_VERSION!=='undefined'||typeof window.buildOptimizedOrderJobs==='function',
+  oldChecklist:()=>typeof window.VU_CHECKLIST_VERSION!=='undefined'||typeof window.vuIssueChecklistOrderToFinishing==='function',
+  oldWorkflowPredictions:()=>typeof window.VU_PREDICTION_VERSION!=='undefined',
+  oldPipelineIntelligence:()=>typeof window.VU_PIPELINE_INTELLIGENCE_VERSION!=='undefined'||typeof window.buildPipelineForecast==='function',
+  oldCrossStage:()=>typeof window.VU_CROSS_STAGE_VERSION!=='undefined',
+  oldDailyWorkPacks:()=>typeof window.openDailyWorkPacks==='function',
+  workforcePrintRouter:()=>!!window.VUWorkforcePrintV9026,
+  factorySheetsV9025:()=>!!window.VUFactorySheetsV9025,
+  combinedFinishingPrint:()=>!!window.VUCombinedFinishingPaintingWorksheet,
+  oldFreshnessCoordinator:()=>!!window.VUEnsureInitialSharedData,
+  oldPaintingPatch:()=>!!window.VUPaintingManufacturingDivision
 };
 function audit(){
   const status={};for(const[name,test]of Object.entries(checks)){try{status[name]=!!test()}catch{status[name]=false}}
-  const legacy={workforcePrintRouter:!!window.VUWorkforcePrintV9026,factorySheetsV9025:!!window.VUFactorySheetsV9025,combinedFinishingPrint:!!window.VUCombinedFinishingPaintingWorksheet,oldFreshnessCoordinator:!!window.VUEnsureInitialSharedData,oldPaintingPatch:!!window.VUPaintingManufacturingDivision,discardedSameDayWrapper:!!window.VUSequentialWorkflowForecast};
+  const legacy={};for(const[name,test]of Object.entries(legacyChecks)){try{legacy[name]=!!test()}catch{legacy[name]=false}}
   if(Object.values(legacy).some(Boolean))console.warn('Legacy runtime authority detected',legacy);
   if(Object.values(status).some(v=>!v))console.warn('Runtime authority missing or stale',status);
-  return{build:window.VU_BUILD,status,legacy};
+  return{build:window.VU_BUILD,status,legacy,clean:!Object.values(legacy).some(Boolean)&&!Object.values(status).some(v=>!v)};
 }
-window.VURuntimeAudit={version:'9.0.82',audit};setTimeout(audit,0);
+window.VURuntimeAudit={version:'9.0.83',audit};setTimeout(audit,0);
 })();
