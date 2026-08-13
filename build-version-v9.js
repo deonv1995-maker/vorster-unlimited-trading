@@ -1,9 +1,9 @@
-/* V9.1.07 — consolidated runtime build label and late operational authority loader.
+/* V9.1.08 — consolidated runtime build label and late operational authority loader.
    The base app finishes loading first; current operational authorities are then loaded sequentially
    so older modules cannot overwrite the latest Production/Painting/Dispatch behaviour. */
 (function(){
 'use strict';
-const BUILD='V9.1.07';
+const BUILD='V9.1.08';
 window.VU_BUILD=BUILD;
 function applyBuildLabel(){
   const runtime=document.getElementById('runtimeBuild');
@@ -32,7 +32,7 @@ async function waitForBase(){
     if(window.VUUIStability&&window.VURuntimeAudit&&window.VUDailyFactoryPack&&window.VUPaintedStockInventoryAuthority)return true;
     await new Promise(r=>setTimeout(r,60));
   }
-  console.warn('V9.1.07 base-runtime wait timed out; loading operational authorities anyway.');
+  console.warn('V9.1.08 base-runtime wait timed out; loading operational authorities anyway.');
   return false;
 }
 async function loadOperationalExtensions(){
@@ -43,11 +43,12 @@ async function loadOperationalExtensions(){
     await loadScriptOnce('painting-worksheet-recovery-v9.js?v=9.1.04','data-vu-paint-recovery','Could not load Painting worksheet recovery');
     await loadScriptOnce('painting-full-order-authority-v9.js?v=9.1.05','data-vu-paint-full-order','Could not load full-order Painting authority');
     await loadScriptOnce('order-update-recalc-authority-v9.js?v=9.1.07','data-vu-order-recalc','Could not load order update recalculation authority');
+    await loadScriptOnce('painting-worksheet-group-authority-v9.js?v=9.1.08','data-vu-paint-group','Could not load Painting worksheet grouping authority');
     applyBuildLabel();
     window.dispatchEvent(new CustomEvent('vu:operational-authorities-ready',{detail:{build:BUILD}}));
     setTimeout(()=>{try{window.VURuntimeAudit?.audit?.()}catch{}},0);
   }catch(e){
-    console.error('V9.1.07 operational authority load failed',e);
+    console.error('V9.1.08 operational authority load failed',e);
     const main=document.getElementById('main');
     if(main&&!document.getElementById('vuOperationalLoadWarning'))main.insertAdjacentHTML('afterbegin','<div id="vuOperationalLoadWarning" class="card" style="border-color:#b45c55"><b>Operational update did not load completely.</b><br><small>Refresh once while online before capturing factory results.</small></div>');
   }
@@ -55,5 +56,5 @@ async function loadOperationalExtensions(){
 applyBuildLabel();
 loadOperationalExtensions();
 window.VUApplyBuildLabel=applyBuildLabel;
-window.VUOperationalBuild={version:'9.1.07',ready:()=>!!window.VUPaintingFullOrderAuthority&&!!window.VUDailyDispatchCapture&&!!window.VUProductionSetDeleteAuthority&&!!window.VUOrderUpdateRecalcAuthority};
+window.VUOperationalBuild={version:'9.1.08',ready:()=>!!window.VUPaintingFullOrderAuthority&&!!window.VUDailyDispatchCapture&&!!window.VUProductionSetDeleteAuthority&&!!window.VUOrderUpdateRecalcAuthority&&!!window.VUPaintingWorksheetGroupAuthority};
 })();
