@@ -1,6 +1,6 @@
 /* Factory OS bootstrap bridge. */
 (function(){
-'use strict';const BUILD='FACTORY-OS-1.0.2';window.VU_BUILD=BUILD;
+'use strict';const BUILD='FACTORY-OS-1.0.3';window.VU_BUILD=BUILD;
 function label(){const el=document.getElementById('runtimeBuild');if(el)el.textContent=BUILD}
 function load(src,mark){return new Promise((resolve,reject)=>{const existing=document.querySelector(`script[data-${mark}]`);if(existing)return resolve();const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(`data-${mark}`,'1');s.onload=resolve;s.onerror=reject;document.body.appendChild(s)})}
 async function start(){
@@ -9,10 +9,19 @@ async function start(){
  await load('factory-os-home-v1.js?v=1.0.0','factory-home');
  await load('factory-os-office-intake-v1.js?v=1.0.0','factory-office-intake');
  await load('factory-os-office-intake-bridge-v1.js?v=1.0.0','factory-office-intake-bridge');
+ await load('factory-os-demand-v1.js?v=1.0.0','factory-demand');
+ await load('factory-os-manufacturing-v1.js?v=1.0.0','factory-manufacturing');
  label();
  const oldDashboard=window.dashboard;
  window.dashboard=async function(){if(window.VUFactoryOSHome?.render)return window.VUFactoryOSHome.render();if(typeof oldDashboard==='function')return oldDashboard()};
  try{dashboard=window.dashboard}catch{}
+ document.addEventListener('click',event=>{
+  const btn=event.target.closest?.('[data-fos-action]');if(!btn)return;
+  const action=btn.dataset.fosAction,role=window.VUFactoryOS?.role?.()||'Management';
+  if(action==='manufacturing'&&window.VUFactoryManufacturing?.open){event.preventDefault();event.stopImmediatePropagation();window.VUFactoryManufacturing.open();}
+  if(action==='division'&&window.VUFactoryManufacturing?.open){event.preventDefault();event.stopImmediatePropagation();window.VUFactoryManufacturing.open(role);}
+  if(action==='painting'&&window.VUFactoryManufacturing?.open){event.preventDefault();event.stopImmediatePropagation();window.VUFactoryManufacturing.open('Painting');}
+ },true);
  const role=window.VUFactoryOS?.role?.()||'Management';
  const nav=document.querySelector('.bottom-nav');if(nav)nav.style.display='none';
  const calendar=document.getElementById('calendarQuickBtn');if(calendar)calendar.style.display=['Management','Office','Delivery'].includes(role)?'':'none';
@@ -20,5 +29,5 @@ async function start(){
  if(typeof window.navigate==='function')await window.navigate('dashboard');
 }
 label();start().catch(e=>console.error('Factory OS bootstrap failed',e));
-window.VUOperationalBuild={version:'factory-os-1.0.2'};
+window.VUOperationalBuild={version:'factory-os-1.0.3'};
 })();
