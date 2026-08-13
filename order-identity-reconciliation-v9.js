@@ -26,6 +26,6 @@ async function reconcile(){
   }
   return {changed};
 }
-setTimeout(()=>reconcile().catch(e=>console.warn('Order identity reconciliation failed',e)),150);
 window.VUOrderIdentityReconciliation={version:'9.2.0',reconcile};
+reconcile().catch(e=>console.warn('Order identity reconciliation failed',e));
 })();
