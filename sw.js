@@ -1,5 +1,5 @@
-/* V9.3.3 — Digital Factory offline app-shell cache. No forced navigation of open clients. */
-const VU_SW_BUILD='9.3.3';
+/* V9.3.4 — Digital Factory offline app-shell cache. No forced navigation of open clients. */
+const VU_SW_BUILD='9.3.4';
 const CACHE=`vu-app-${VU_SW_BUILD}`;
 const PRECACHE=[
   './','./index.html','./manifest.webmanifest','./vorster-logo.jpg',
@@ -9,7 +9,7 @@ const PRECACHE=[
   './business-outcome-optimizer-v9.js','./manager-plan-priority-v9.js','./completion-schedule.js','./completion-schedule-optimizer-authority-v9.js','./order-progress-v9.js',
   './shared-data-v9.js','./shared-data-project-defaults-v9.js','./shared-data-bootstrap-fix-v9.js','./shared-data-batched-pull-v9.js','./shared-reconciliation-v9.js','./shared-refresh-v9.js',
   './painted-stock-inventory-authority-v9.js','./navigation-authority-v9.js','./dashboard-authority-v9.js','./daily-factory-pack-v9.js','./auto-fulfilment-planner-v9.js','./factory-pack-fulfilment-authority-v9.js','./runtime-integrity-v9.js','./ui-stability-v9.js',
-  './build-version-v9.js','./production-set-delete-authority-v9.js','./painting-full-order-authority-v9.js','./order-update-recalc-authority-v9.js','./worksheet-paint-reconciliation-authority-v9.js','./order-identity-reconciliation-v9.js','./partial-dispatch-capture-v9.js','./dispatch-stepper-authority-v9.js','./live-factory-pack-authority-v9.js','./digital-factory-v93.js','./digital-factory-role-shell-v93.js','./digital-factory-manager-dashboard-v93.js','./digital-factory-manager-control-v93.js'
+  './build-version-v9.js','./production-set-delete-authority-v9.js','./painting-full-order-authority-v9.js','./order-update-recalc-authority-v9.js','./worksheet-paint-reconciliation-authority-v9.js','./order-identity-reconciliation-v9.js','./partial-dispatch-capture-v9.js','./dispatch-stepper-authority-v9.js','./live-factory-pack-authority-v9.js','./digital-factory-v93.js','./digital-factory-target-overrides-v93.js','./digital-factory-target-bridge-v93.js','./digital-factory-role-shell-v93.js','./digital-factory-manager-dashboard-v93.js','./digital-factory-manager-control-v93.js','./digital-factory-manager-targets-v93.js'
 ];
 async function precache(){const cache=await caches.open(CACHE);await Promise.all(PRECACHE.map(async url=>{try{const r=await fetch(url,{cache:'no-store'});if(r.ok)await cache.put(url,r.clone())}catch{}}))}
 self.addEventListener('install',event=>{event.waitUntil((async()=>{await precache();await self.skipWaiting()})())});
