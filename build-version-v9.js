@@ -1,23 +1,22 @@
-/* V9.4.4 — single navigation owner + stable page motion with separate Manager/leader paths. */
+/* Factory OS bootstrap bridge. */
 (function(){
-'use strict';const BUILD='V9.4.4',ROLE_KEY='vu-digital-factory-device-role';window.VU_BUILD=BUILD;
-function applyBuildLabel(){const runtime=document.getElementById('runtimeBuild');if(runtime)runtime.textContent=BUILD;document.querySelectorAll('[data-vu-build]').forEach(el=>el.textContent=BUILD)}
-function loadScriptOnce(src,marker){return new Promise((resolve,reject)=>{const existing=document.querySelector(`script[${marker}]`);if(existing){if(existing.dataset.loaded==='1')return resolve();existing.addEventListener('load',resolve,{once:true});existing.addEventListener('error',reject,{once:true});return}const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(marker,'1');s.onload=()=>{s.dataset.loaded='1';resolve()};s.onerror=reject;document.body.appendChild(s)})}
-async function waitForBase(){const start=Date.now();while(Date.now()-start<20000){if(window.VUUIStability&&window.VURuntimeAudit&&window.VUDailyFactoryPack&&window.VUPaintedStockInventoryAuthority)return;await new Promise(r=>setTimeout(r,60))}}
-async function loadOperationalExtensions(){await waitForBase();for(const [src,mark] of [['production-set-delete-authority-v9.js','production-set-delete'],['painting-full-order-authority-v9.js','paint-full-order'],['order-update-recalc-authority-v9.js','order-recalc'],['worksheet-paint-reconciliation-authority-v9.js','paint-reconcile'],['order-identity-reconciliation-v9.js','order-identity'],['partial-dispatch-capture-v9.js','partial-dispatch'],['dispatch-stepper-authority-v9.js','dispatch-stepper'],['live-factory-pack-authority-v9.js','live-pack'],['navigation-motion-stability-v9.js','navigation-motion-stability']])await loadScriptOnce(`${src}?v=9.4.4`,`data-vu-${mark}`);
-  const role=String(localStorage.getItem(ROLE_KEY)||'Manager');
-  if(role==='Manager'){
-    await loadScriptOnce('digital-factory-target-overrides-v93.js?v=9.4.4','data-vu-digital-target-overrides');
-    await loadScriptOnce('digital-factory-exceptions-v93.js?v=9.4.4','data-vu-digital-exceptions');
-    await loadScriptOnce('manager-role-control-v9.js?v=9.4.4','data-vu-manager-role-control');
-  }else{
-    await loadScriptOnce('digital-factory-v93.js?v=9.4.4','data-vu-digital-factory');
-    await loadScriptOnce('digital-factory-target-overrides-v93.js?v=9.4.4','data-vu-digital-target-overrides');
-    await loadScriptOnce('digital-factory-target-bridge-v93.js?v=9.4.4','data-vu-digital-target-bridge');
-    await loadScriptOnce('digital-factory-exceptions-v93.js?v=9.4.4','data-vu-digital-exceptions');
-    await loadScriptOnce('digital-factory-role-shell-v93.js?v=9.4.4','data-vu-digital-factory-role-shell');
-  }
-  applyBuildLabel();window.dispatchEvent(new CustomEvent('vu:operational-authorities-ready',{detail:{build:BUILD,role}}));
+'use strict';const BUILD='FACTORY-OS-1.0.0';window.VU_BUILD=BUILD;
+function label(){const el=document.getElementById('runtimeBuild');if(el)el.textContent=BUILD}
+function load(src,mark){return new Promise((resolve,reject)=>{const existing=document.querySelector(`script[data-${mark}]`);if(existing)return resolve();const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(`data-${mark}`,'1');s.onload=resolve;s.onerror=reject;document.body.appendChild(s)})}
+async function start(){
+ await load('factory-os-core-v1.js?v=1.0.0','factory-core');
+ await load('factory-os-roles-v1.js?v=1.0.0','factory-roles');
+ await load('factory-os-home-v1.js?v=1.0.0','factory-home');
+ label();
+ const oldDashboard=window.dashboard;
+ window.dashboard=async function(){if(window.VUFactoryOSHome?.render)return window.VUFactoryOSHome.render();if(typeof oldDashboard==='function')return oldDashboard()};
+ try{dashboard=window.dashboard}catch{}
+ const role=window.VUFactoryOS?.role?.()||'Management';
+ const nav=document.querySelector('.bottom-nav');if(nav)nav.style.display='none';
+ const calendar=document.getElementById('calendarQuickBtn');if(calendar)calendar.style.display=['Management','Office','Delivery'].includes(role)?'':'none';
+ const merge=document.getElementById('mergeNativeBtn');if(merge)merge.style.display=role==='Management'?'':'none';
+ if(typeof window.navigate==='function')await window.navigate('dashboard');
 }
-applyBuildLabel();loadOperationalExtensions().catch(e=>console.error('V9.4.4 operational authority load failed',e));window.VUApplyBuildLabel=applyBuildLabel;window.VUOperationalBuild={version:'9.4.4',ready:()=>!!window.VUPaintingFullOrderAuthority&&!!window.VUPartialDispatchCapture&&!!window.VUOrderIdentityReconciliation&&!!window.VULiveFactoryPackAuthority&&!!window.VUNavigationMotionStability};
+label();start().catch(e=>console.error('Factory OS bootstrap failed',e));
+window.VUOperationalBuild={version:'factory-os-1.0.0'};
 })();
