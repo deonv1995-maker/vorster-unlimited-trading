@@ -8,16 +8,18 @@ function applyBuildLabel(){
   if(runtime)runtime.textContent=BUILD;
   document.querySelectorAll('[data-vu-build]').forEach(el=>el.textContent=BUILD);
 }
-function loadOperationalExtension(){
-  if(window.VUDailyDispatchCapture||document.querySelector('script[data-vu-daily-dispatch]'))return;
+function loadScriptOnce(src,marker,errorText){
+  if(document.querySelector(`script[${marker}]`))return;
   const s=document.createElement('script');
-  s.src='daily-dispatch-capture-v9.js?v=9.1.02';
-  s.async=false;
-  s.dataset.vuDailyDispatch='1';
-  s.onerror=()=>console.error('Could not load order-based Delivery & Collection read-in');
+  s.src=src;s.async=false;s.setAttribute(marker,'1');
+  s.onerror=()=>console.error(errorText);
   document.body.appendChild(s);
 }
+function loadOperationalExtensions(){
+  if(!window.VUDailyDispatchCapture)loadScriptOnce('daily-dispatch-capture-v9.js?v=9.1.02','data-vu-daily-dispatch','Could not load order-based Delivery & Collection read-in');
+  if(!window.VUProductionSetDeleteAuthority)loadScriptOnce('production-set-delete-authority-v9.js?v=9.1.03','data-vu-production-set-delete','Could not load production set delete authority');
+}
 applyBuildLabel();
-loadOperationalExtension();
+loadOperationalExtensions();
 window.VUApplyBuildLabel=applyBuildLabel;
 })();
