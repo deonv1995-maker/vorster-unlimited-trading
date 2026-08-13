@@ -1,9 +1,2 @@
 /* Factory OS finishing module */
-(function(){
-'use strict';
-if(window.VUFactoryFinishing)return;
-const RAW='Raw';
-const balanceId=(productId,colour)=>`${productId}::${String(colour||'Standard').trim().toLowerCase()}`;
-async function balance(productId,colour){const row=await getOne('inventoryBalances',balanceId(productId,colour));return Number(row?.quantity||0)}
-window.VUFactoryFinishing={version:'2.2.0',RAW,balanceId,balance};
-})();
+(function(){'use strict';if(window.VUFactoryFinishing)return;const RAW='Raw';const balanceId=(productId,colour)=>`${productId}::${String(colour||'Standard').trim().toLowerCase()}`;async function balance(productId,colour){const row=await getOne('inventoryBalances',balanceId(productId,colour));return Number(row?.quantity||0)}async function move(item,qty){const quantity=Math.max(0,Math.round(Number(qty||0)));if(!quantity)throw new Error('Enter a finished quantity greater than zero.');const product=await getOne('products',item.productId);if(!product)throw new Error('Product not found.');const colour=String(item.colour||'Standard').trim()||'Standard';const rawBefore=await balance(product.id,RAW),finishedBefore=await balance(product.id,colour);if(quantity>rawBefore)throw new Error(`Only ${rawBefore} Raw units are available.`);const rawAfter=rawBefore-quantity,finishedAfter=finishedBefore+quantity,now=new Date().toISOString();await putOne('inventoryBalances',{id:balanceId(product.id,RAW),productId:product.id,productCode:product.code,productName:product.name,colourName:RAW,quantity:rawAfter,updatedAt:now});await putOne('inventoryBalances',{id:balanceId(product.id,colour),productId:product.id,productCode:product.code,productName:product.name,colourName:colour,quantity:finishedAfter,updatedAt:now});return{product,colour,quantity,rawBefore,rawAfter,finishedBefore,finishedAfter,now}}window.VUFactoryFinishing={version:'2.2.1',RAW,balanceId,balance,move};})();
