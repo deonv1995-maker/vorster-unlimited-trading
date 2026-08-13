@@ -1,0 +1,10 @@
+/* Factory OS 2.4 — role-safe stock ledger. */
+(function(){'use strict';if(window.VUFactoryStock)return;
+const RAW='Raw',norm=v=>String(v||'').trim().toLowerCase();
+const balanceId=(productId,colour)=>`${productId}::${String(colour||'Standard').trim().toLowerCase()}`;
+const role=()=>window.VUFactoryOS?.role?.()||'Management';
+const divisionOf=p=>String(p?.worksheetDivision||p?.primaryDivision||'Unclassified').trim();
+function productAllowed(p){const r=role();if(r==='Management'||r==='Painting')return true;return ['Casting','Packing','Resin'].includes(r)&&divisionOf(p)===r;}
+function colourAllowed(name){const r=role();if(r==='Management')return true;if(['Casting','Packing','Resin'].includes(r))return norm(name)===norm(RAW);if(r==='Painting')return norm(name)!==norm(RAW);return false;}
+async function saveCount(product,changes,note=''){if(!productAllowed(product))throw new Error('Product is not available to this role.');const now=new Date().toISOString();for(const change of changes){const colour=String(change.colour||'Standard').trim()||'Standard';if(!colourAllowed(colour))throw new Error(`This role cannot change ${colour} stock.`);const id=balanceId(product.id,colour),previous=await getOne('inventoryBalances',id),before=Number(previous?.quantity||0),after=Math.max(0,Math.round(Number(change.quantity||0)));await putOne('inventoryBalances',{id,productId:product.id,productCode:product.code,productName:product.name,colourName:colour,quantity:after,updatedAt:now});if(before!==after)await putOne('inventoryTransactions',{id:uid('inv'),productId:product.id,productCode:product.code,productName:product.name,colourName:colour,type:'STOCK_COUNT',previousQuantity:before,quantityChange:after-before,newQuantity:after,note:String(note||'').trim()||'Physical stock count',recordedByRole:role(),createdAt:now});}return true;}
+window.VUFactoryStock={version:'2.4.0',RAW,balanceId,role,divisionOf,productAllowed,colourAllowed,saveCount};})();
