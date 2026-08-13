@@ -1,6 +1,6 @@
 /* Factory OS bootstrap bridge. */
 (function(){
-'use strict';const BUILD='FACTORY-OS-1.0.3';window.VU_BUILD=BUILD;
+'use strict';const BUILD='FACTORY-OS-1.0.5';window.VU_BUILD=BUILD;
 function label(){const el=document.getElementById('runtimeBuild');if(el)el.textContent=BUILD}
 function load(src,mark){return new Promise((resolve,reject)=>{const existing=document.querySelector(`script[data-${mark}]`);if(existing)return resolve();const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(`data-${mark}`,'1');s.onload=resolve;s.onerror=reject;document.body.appendChild(s)})}
 async function start(){
@@ -28,6 +28,8 @@ async function start(){
  const merge=document.getElementById('mergeNativeBtn');if(merge)merge.style.display=role==='Management'?'':'none';
  if(typeof window.navigate==='function')await window.navigate('dashboard');
 }
+async function loadFinal(){try{await load('factory-os-final-v1.js?v=1.0.5','factory-final');window.VUFactoryOSFinal?.apply?.()}catch(e){console.error('Factory OS final authority failed',e)}}
 label();start().catch(e=>console.error('Factory OS bootstrap failed',e));
-window.VUOperationalBuild={version:'factory-os-1.0.3'};
+if(document.readyState==='complete')setTimeout(loadFinal,0);else window.addEventListener('load',()=>setTimeout(loadFinal,0),{once:true});
+window.VUOperationalBuild={version:'factory-os-1.0.5'};
 })();
