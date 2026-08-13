@@ -1,6 +1,7 @@
-/* V9.4.5 — startup first-paint gate + service-worker registration guard.
-   Legacy app.js still performs an early dashboard render. Keep the shell visually gated until the
-   final navigation authority emits its first completed page render, so legacy dashboard data never flashes. */
+/* V9.4.6 — deterministic startup gate + service-worker registration guard.
+   Legacy app.js may render its old dashboard during module loading, but that output remains hidden.
+   Once the operational runtime is ready, explicitly run the authoritative initial page, then reveal.
+   A safety timeout guarantees the app can never remain permanently hidden. */
 (function installRuntimeGuard(){
   try{
     document.documentElement.classList.add('vu-booting');
@@ -11,15 +12,47 @@
       document.head.appendChild(style);
     }
   }catch{}
-  let released=false;
+
+  let released=false,finalizing=false;
   window.VUReleaseBootGate=function(){
-    if(released)return;released=true;
+    if(released)return;
+    released=true;
     try{document.documentElement.classList.remove('vu-booting')}catch{}
   };
+
+  async function finalizeInitialPage(){
+    if(finalizing||released)return;
+    finalizing=true;
+    try{
+      if(typeof window.VUFinalizeInitialPage==='function'){
+        await window.VUFinalizeInitialPage();
+      }else if(window.VUNavigationAuthority?.navigate){
+        await window.VUNavigationAuthority.navigate('dashboard');
+      }else if(typeof window.dashboard==='function'){
+        await window.dashboard();
+      }
+    }catch(error){
+      console.error('Authoritative initial page failed',error);
+    }finally{
+      requestAnimationFrame(()=>window.VUReleaseBootGate?.());
+    }
+  }
+
   window.addEventListener('vu:page-rendered',event=>{
     if(event?.detail?.refresh)return;
     requestAnimationFrame(()=>window.VUReleaseBootGate?.());
   },{once:true});
+
+  window.addEventListener('vu:operational-authorities-ready',()=>{
+    finalizeInitialPage();
+  },{once:true});
+
+  // Never allow a module failure to strand the user on a blank screen.
+  setTimeout(()=>{
+    if(released)return;
+    if(window.VUNavigationAuthority||typeof window.dashboard==='function')finalizeInitialPage();
+    setTimeout(()=>window.VUReleaseBootGate?.(),1500);
+  },4500);
 
   if(!('serviceWorker' in navigator))return;
   const sw=navigator.serviceWorker,original=sw.register.bind(sw);
