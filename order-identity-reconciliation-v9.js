@@ -1,6 +1,6 @@
-/* V9.1.15 — reconcile operational records to the current commercial order identity.
-   Imported order updates can replace an internal order id while keeping the same order number.
-   Painting/painted reservations are relinked by order number so dispatch and worksheets see them. */
+/* V9.2.0 — reconcile operational records to the current commercial order identity.
+   Data-only migration helper: it no longer wraps dispatch buttons or global open functions.
+   Imported order updates can replace an internal order id while keeping the same order number. */
 (function(){
 'use strict';
 if(window.VUOrderIdentityReconciliation)return;
@@ -12,11 +12,12 @@ async function reconcile(){
   for(const o of orders){const no=norm(o.orderNumber);if(no)byNumber.set(no,o)}
   let changed=0;
   for(const j of jobs){
-    if(!['orderPaintingLine','paintedStockReservation'].includes(j?.kind))continue;
+    if(!['orderPaintingLine','paintedStockReservation','factoryDispatchResult'].includes(j?.kind))continue;
     const no=norm(j.orderNumber);if(!no)continue;
     const current=byNumber.get(no);if(!current)continue;
     if(String(j.orderId||'')===String(current.id||''))continue;
-    await putOne('productionJobs',{...j,orderId:current.id,orderNumber:current.orderNumber||j.orderNumber,customerName:current.customerName||j.customerName||'',identityReconciledAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
+    const now=new Date().toISOString();
+    await putOne('productionJobs',{...j,orderId:current.id,orderNumber:current.orderNumber||j.orderNumber,customerName:current.customerName||j.customerName||'',identityReconciledAt:now,updatedAt:now});
     changed++;
   }
   if(changed){
@@ -25,11 +26,6 @@ async function reconcile(){
   }
   return {changed};
 }
-const priorOpen=window.openDailyDispatchCapture;
-async function openDispatch(...args){await reconcile();return priorOpen?.(...args)}
-function rebind(){document.querySelectorAll('[data-open-dispatch]').forEach(b=>{b.onclick=()=>openDispatch()})}
-const obs=new MutationObserver(()=>setTimeout(rebind,80));obs.observe(document.body,{childList:true,subtree:true});
-setTimeout(async()=>{await reconcile();rebind()},200);
-window.openDailyDispatchCapture=openDispatch;
-window.VUOrderIdentityReconciliation={version:'9.1.15',reconcile,openDispatch};
+setTimeout(()=>reconcile().catch(e=>console.warn('Order identity reconciliation failed',e)),150);
+window.VUOrderIdentityReconciliation={version:'9.2.0',reconcile};
 })();
