@@ -21,7 +21,7 @@ const checks={
   businessOperations:()=>present(window.VUBusinessOutcomeOperations),
   divisionWorksheets:()=>present(window.VUStrictDivisionWorksheets),
   unifiedRawProduction:()=>exact(window.VURawProductionUnified,'9.0.82'),
-  dailyFactoryPack:()=>exact(window.VUFactoryPackFulfilmentAuthority,'9.0.93')&&present(window.VUDailyFactoryPack),
+  dailyFactoryPack:()=>exact(window.VUFactoryPackFulfilmentAuthority,'9.1.06')&&String(window.VUDailyFactoryPack?.version||'')==='9.1.06',
   paintedStockInventory:()=>exact(window.VUPaintedStockInventoryAuthority,'9.0.96'),
   fullOrderPainting:()=>exact(window.VUPaintingFullOrderAuthority,'9.1.05')&&String(window.VUPaintingOrderCapture?.version||'')==='9.1.05',
   productionSetDelete:()=>exact(window.VUProductionSetDeleteAuthority,'9.1.03'),
