@@ -1,4 +1,4 @@
-/* V9.0.89 — runtime authority audit. Diagnostic only; never writes business data. */
+/* V9.1.06 — consolidated runtime authority audit. Diagnostic only; never writes business data. */
 (function(){
 'use strict';
 const exact=(obj,version)=>!!obj&&String(obj.version||'')===version;
@@ -10,7 +10,7 @@ const checks={
   dashboard:()=>present(window.VUDashboardAuthority),
   orderCommitment:()=>present(window.VUOrderCommitment),
   managerPlanPriority:()=>exact(window.VUManagerPlanPriority,'9.0.84'),
-  autoFulfilmentPlanner:()=>exact(window.VUAutoFulfilmentPlanner,'9.0.89'),
+  autoFulfilmentPlanner:()=>exact(window.VUAutoFulfilmentPlanner,'9.0.90'),
   fulfilmentCalendar:()=>exact(window.VUFulfilmentCalendarStandalone,'9.0.89')&&typeof window.openFulfilmentCalendar==='function',
   calendarQuickButton:()=>!!document.getElementById('calendarQuickBtn'),
   orderProgress:()=>exact(window.VUOrderProgress,'9.0.80'),
@@ -21,8 +21,11 @@ const checks={
   businessOperations:()=>present(window.VUBusinessOutcomeOperations),
   divisionWorksheets:()=>present(window.VUStrictDivisionWorksheets),
   unifiedRawProduction:()=>exact(window.VURawProductionUnified,'9.0.82'),
-  dailyFactoryPack:()=>present(window.VUDailyFactoryPack),
-  paintingCapture:()=>present(window.VUPaintingOrderCapture),
+  dailyFactoryPack:()=>exact(window.VUFactoryPackFulfilmentAuthority,'9.0.93')&&present(window.VUDailyFactoryPack),
+  paintedStockInventory:()=>exact(window.VUPaintedStockInventoryAuthority,'9.0.96'),
+  fullOrderPainting:()=>exact(window.VUPaintingFullOrderAuthority,'9.1.05')&&String(window.VUPaintingOrderCapture?.version||'')==='9.1.05',
+  productionSetDelete:()=>exact(window.VUProductionSetDeleteAuthority,'9.1.03'),
+  dispatchCapture:()=>exact(window.VUDailyDispatchCapture,'9.1.02'),
   deliveryLogistics:()=>present(window.VUDeliveryLogisticsPlanner),
   sharedData:()=>present(window.VUSharedData),
   sharedRefresh:()=>present(window.VUSharedRefresh),
@@ -46,9 +49,12 @@ const legacyChecks={
 function audit(){
   const status={};for(const[name,test]of Object.entries(checks)){try{status[name]=!!test()}catch{status[name]=false}}
   const legacy={};for(const[name,test]of Object.entries(legacyChecks)){try{legacy[name]=!!test()}catch{legacy[name]=false}}
+  const operationalReady=!!window.VUOperationalBuild?.ready?.();
   if(Object.values(legacy).some(Boolean))console.warn('Legacy runtime authority detected',legacy);
-  if(Object.values(status).some(v=>!v))console.warn('Runtime authority missing or stale',status);
-  return{build:window.VU_BUILD,status,legacy,clean:!Object.values(legacy).some(Boolean)&&!Object.values(status).some(v=>!v)};
+  if(operationalReady&&Object.values(status).some(v=>!v))console.warn('Runtime authority missing or stale',status);
+  return{build:window.VU_BUILD,status,legacy,operationalReady,clean:operationalReady&&!Object.values(legacy).some(Boolean)&&!Object.values(status).some(v=>!v)};
 }
-window.VURuntimeAudit={version:'9.0.89',audit};setTimeout(audit,0);
+window.VURuntimeAudit={version:'9.1.06',audit};
+window.addEventListener('vu:operational-authorities-ready',()=>setTimeout(audit,0));
+setTimeout(()=>{if(window.VUOperationalBuild?.ready?.())audit()},4500);
 })();
