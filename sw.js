@@ -1,6 +1,6 @@
-/* V9.4.5 — lean offline shell with authoritative first-paint startup. */
-const VU_SW_BUILD='9.4.5',CACHE=`vu-app-${VU_SW_BUILD}`;
-const PRECACHE=['./','./index.html','./manifest.webmanifest','./vorster-logo.jpg','./styles.css','./ui-polish-v9.css','./runtime-guard.js','./db.js','./app.js','./navigation-authority-v9.js','./navigation-motion-stability-v9.js','./dashboard-authority-v9.js','./shared-data-v9.js','./shared-refresh-v9.js','./shared-reconciliation-v9.js','./build-version-v9.js','./painting-full-order-authority-v9.js','./partial-dispatch-capture-v9.js','./manager-role-control-v9.js'];
+/* FACTORY-OS-1.0.4 — offline Factory OS shell. */
+const VU_SW_BUILD='factory-os-1.0.4',CACHE=`vu-app-${VU_SW_BUILD}`;
+const PRECACHE=['./','./index.html','./manifest.webmanifest','./vorster-logo.jpg','./styles.css','./ui-polish-v9.css','./runtime-guard.js','./db.js','./app.js','./navigation-authority-v9.js','./navigation-motion-stability-v9.js','./shared-data-v9.js','./shared-refresh-v9.js','./shared-reconciliation-v9.js','./build-version-v9.js','./manager-role-control-v9.js','./job-card-import-v13.js','./factory-os-core-v1.js','./factory-os-roles-v1.js','./factory-os-home-v1.js','./factory-os-office-intake-v1.js','./factory-os-office-intake-bridge-v1.js','./factory-os-demand-v1.js','./factory-os-manufacturing-v1.js'];
 async function precache(){const c=await caches.open(CACHE);for(const u of PRECACHE){try{const r=await fetch(u,{cache:'no-store'});if(r.ok)await c.put(u,r.clone())}catch{}}}
 self.addEventListener('install',e=>e.waitUntil((async()=>{await precache();await self.skipWaiting()})()));
 self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const k of await caches.keys())if(k!==CACHE)await caches.delete(k);await self.clients.claim()})()));
