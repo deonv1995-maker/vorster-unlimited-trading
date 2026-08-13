@@ -1,7 +1,6 @@
-/* V9.4.5 — startup gate + service-worker registration guard.
-   Legacy app.js still performs an early dashboard render. Keep the app visually gated until the
-   final navigation authority has rendered the authoritative first page, so legacy dashboard data
-   can never flash on screen during startup. */
+/* V9.4.5 — startup first-paint gate + service-worker registration guard.
+   Legacy app.js still performs an early dashboard render. Keep the shell visually gated until the
+   final navigation authority emits its first completed page render, so legacy dashboard data never flashes. */
 (function installRuntimeGuard(){
   try{
     document.documentElement.classList.add('vu-booting');
@@ -12,9 +11,15 @@
       document.head.appendChild(style);
     }
   }catch{}
+  let released=false;
   window.VUReleaseBootGate=function(){
+    if(released)return;released=true;
     try{document.documentElement.classList.remove('vu-booting')}catch{}
   };
+  window.addEventListener('vu:page-rendered',event=>{
+    if(event?.detail?.refresh)return;
+    requestAnimationFrame(()=>window.VUReleaseBootGate?.());
+  },{once:true});
 
   if(!('serviceWorker' in navigator))return;
   const sw=navigator.serviceWorker,original=sw.register.bind(sw);
