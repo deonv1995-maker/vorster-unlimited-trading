@@ -18,6 +18,7 @@ function loadScriptOnce(src,marker,errorText){
 function loadOperationalExtensions(){
   if(!window.VUDailyDispatchCapture)loadScriptOnce('daily-dispatch-capture-v9.js?v=9.1.02','data-vu-daily-dispatch','Could not load order-based Delivery & Collection read-in');
   if(!window.VUProductionSetDeleteAuthority)loadScriptOnce('production-set-delete-authority-v9.js?v=9.1.03','data-vu-production-set-delete','Could not load production set delete authority');
+  if(!window.VUPaintingWorksheetRecovery)loadScriptOnce('painting-worksheet-recovery-v9.js?v=9.1.04','data-vu-paint-recovery','Could not load reliable Painting worksheet recovery');
 }
 applyBuildLabel();
 loadOperationalExtensions();
