@@ -1,6 +1,6 @@
-/* Factory OS 2.7.5 — robust Sage customer header repair.
-   Self-contained PDF header reader. Repairs only a blank customer name using the exact
-   Sage customer slot between VAT No and Due Date, before reconciliation sees the cards. */
+/* Factory OS 2.7.6 — robust Sage customer header repair.
+   Repairs only a blank customer name using the exact Sage customer slot between VAT No and Due Date.
+   Sage sometimes places the next header label on the same PDF text row; strip that label safely. */
 (function(){
 'use strict';
 if(window.VUJobCardCustomerHeaderPatchV2)return;
@@ -11,6 +11,8 @@ const PDFJS_WORKER='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.w
 const txt=v=>String(v??'').replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim();
 const code=v=>txt(v).toUpperCase().replace(/\s+/g,'');
 const structural=/^(?:SALES\s*REP|REFERENCE|DATE|DUE\s*DATE|VAT\s*NO|CUSTOMER\s*VAT\s*NO|PAGE|DESCRIPTION|TOTAL|SUB\s*TOTAL|GRAND\s*TOTAL|BALANCE\s*DUE|PHYSICAL\s*ADDRESS|POSTAL\s*ADDRESS|TEL|FAX|BUYER|FROM|TO)\b/i;
+const trailingHeader=/\s*:\s*(?:REFERENCE|SALES\s*REP|DATE|DUE\s*DATE|VAT\s*NO|CUSTOMER\s*VAT\s*NO|PAGE|DESCRIPTION|PHYSICAL\s*ADDRESS|POSTAL\s*ADDRESS|TEL|FAX|BUYER|FROM|TO)\b.*$/i;
+function cleanCustomer(v){return txt(v).replace(trailingHeader,'').replace(/\s*:\s*$/,'').trim()}
 async function ensurePdf(){
  if(window.pdfjsLib){window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS_WORKER;return window.pdfjsLib}
  await new Promise((ok,no)=>{const s=document.createElement('script');s.src=PDFJS_URL;s.onload=ok;s.onerror=()=>no(new Error('Could not load PDF reader for customer verification.'));document.head.appendChild(s)});
@@ -24,9 +26,10 @@ function customerFromHeader(lines){
  const header=lines.slice(0,desc>=0?desc:lines.length);
  const vat=header.findIndex(l=>/^VAT\s*No\s*:/i.test(l));
  const due=header.findIndex((l,i)=>i>vat&&/^Due\s*Date\s*:/i.test(l));
- if(vat<0||due<0||due<=vat+1)return'';
- for(let i=vat+1;i<due;i++){
-  let value=txt(header[i]).replace(/\s*:\s*$/,'').trim();
+ if(vat<0)return'';
+ const stop=due>vat?due:Math.min(header.length,vat+5);
+ for(let i=vat+1;i<stop;i++){
+  const value=cleanCustomer(header[i]);
   if(value.length<3||structural.test(value))continue;
   if(/@/.test(value)||/R\s*[\d,.]+/i.test(value)||/\b\d{7,}\b/.test(value)||!/[A-Za-z]/.test(value))continue;
   return value;
@@ -49,11 +52,14 @@ async function parseWithRepair(files){
  const namesPromise=readNames(files).catch(e=>{console.warn('Sage customer header repair unavailable',e);return new Map()});
  const cards=await original(files),names=await namesPromise;
  return (cards||[]).map(card=>{
-  if(txt(card.customerName))return card;
-  const name=names.get(code(card.orderNumber));
-  return name?{...card,customerName:name,customerIdentitySource:'sage-header-slot-v2'}:card;
+  const repaired=names.get(code(card.orderNumber));
+  const current=cleanCustomer(card.customerName);
+  const needsRepair=!current||trailingHeader.test(txt(card.customerName));
+  if(repaired&&needsRepair)return{...card,customerName:repaired,customerIdentitySource:'sage-header-slot-v2.7.6'};
+  if(current&&current!==txt(card.customerName))return{...card,customerName:current,customerIdentitySource:'sage-header-clean-v2.7.6'};
+  return card;
  });
 }
 window.parseSagePdfFiles=parseWithRepair;
-window.VUJobCardCustomerHeaderPatchV2={version:'2.7.5',customerFromHeader,parseWithRepair};
+window.VUJobCardCustomerHeaderPatchV2={version:'2.7.6',customerFromHeader,cleanCustomer,parseWithRepair};
 })();
