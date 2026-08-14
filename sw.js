@@ -1,7 +1,32 @@
-/* FACTORY-OS-1.0.4 — offline Factory OS shell. */
-const VU_SW_BUILD='factory-os-1.0.4',CACHE=`vu-app-${VU_SW_BUILD}`;
-const PRECACHE=['./','./index.html','./manifest.webmanifest','./vorster-logo.jpg','./styles.css','./ui-polish-v9.css','./runtime-guard.js','./db.js','./app.js','./navigation-authority-v9.js','./navigation-motion-stability-v9.js','./shared-data-v9.js','./shared-refresh-v9.js','./shared-reconciliation-v9.js','./build-version-v9.js','./manager-role-control-v9.js','./job-card-import-v13.js','./factory-os-core-v1.js','./factory-os-roles-v1.js','./factory-os-home-v1.js','./factory-os-office-intake-v1.js','./factory-os-office-intake-bridge-v1.js','./factory-os-demand-v1.js','./factory-os-manufacturing-v1.js'];
+/* FACTORY-OS-2.4.6 — offline Factory OS shell. */
+const VU_SW_BUILD='factory-os-2.4.6',CACHE=`vu-app-${VU_SW_BUILD}`;
+const PRECACHE=[
+ './',
+ './index.html',
+ './manifest.webmanifest',
+ './vorster-logo.jpg',
+ './factory-os-app.css?v=2.4.6',
+ './db.js?v=2.4.6',
+ './shared-data-v9.js?v=2.4.6',
+ './factory-os-core-v1.js?v=2.4.6',
+ './factory-os-roles-v1.js?v=2.4.6',
+ './factory-os-demand-v1.js?v=2.4.6',
+ './factory-os-production-output-v1.js?v=2.4.6',
+ './factory-os-manufacturing-v1.js?v=2.4.6',
+ './factory-os-finishing-v1.js?v=2.4.6',
+ './factory-os-finishing-workspace-v1.js?v=2.4.6',
+ './factory-os-dispatch-v1.js?v=2.4.6',
+ './factory-os-dispatch-workspace-v1.js?v=2.4.6',
+ './job-card-import-v13.js?v=2.4.6',
+ './factory-os-office-intake-v1.js?v=2.4.6',
+ './factory-os-home-v1.js?v=2.4.6',
+ './factory-os-runtime-v5.js?v=2.4.6',
+ './factory-os-stock-ledger-v1.js?v=2.4.6',
+ './factory-os-stock-workspace-v1.js?v=2.4.6',
+ './app-update.js?v=2.4.6'
+];
 async function precache(){const c=await caches.open(CACHE);for(const u of PRECACHE){try{const r=await fetch(u,{cache:'no-store'});if(r.ok)await c.put(u,r.clone())}catch{}}}
 self.addEventListener('install',e=>e.waitUntil((async()=>{await precache();await self.skipWaiting()})()));
 self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const k of await caches.keys())if(k!==CACHE)await caches.delete(k);await self.clients.claim()})()));
+self.addEventListener('message',e=>{if(e.data?.type==='SKIP_WAITING')self.skipWaiting()});
 self.addEventListener('fetch',e=>{const r=e.request;if(r.method!=='GET')return;e.respondWith((async()=>{const c=await caches.open(CACHE);try{const f=await fetch(r,{cache:'no-store'});if(f.ok&&new URL(r.url).origin===self.location.origin)c.put(r,f.clone()).catch(()=>{});return f}catch{const exact=await c.match(r);if(exact)return exact;if(r.mode==='navigate')return(await c.match('./index.html'))||(await c.match('./'));return Response.error()}})())});
