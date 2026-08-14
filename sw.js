@@ -1,29 +1,29 @@
-/* FACTORY-OS-2.4.7 — offline Factory OS shell. */
-const VU_SW_BUILD='factory-os-2.4.7',CACHE=`vu-app-${VU_SW_BUILD}`;
+/* FACTORY-OS-2.4.8 — offline Factory OS shell. */
+const VU_SW_BUILD='factory-os-2.4.8',CACHE=`vu-app-${VU_SW_BUILD}`;
 const PRECACHE=[
  './',
  './index.html',
- './manifest.webmanifest?v=2.4.7',
+ './manifest.webmanifest?v=2.4.8',
  './vorster-logo.jpg',
- './factory-os-app.css?v=2.4.7',
- './db.js?v=2.4.7',
- './shared-data-v9.js?v=2.4.7',
- './factory-os-core-v1.js?v=2.4.7',
- './factory-os-roles-v1.js?v=2.4.7',
- './factory-os-demand-v1.js?v=2.4.7',
- './factory-os-production-output-v1.js?v=2.4.7',
- './factory-os-manufacturing-v1.js?v=2.4.7',
- './factory-os-finishing-v1.js?v=2.4.7',
- './factory-os-finishing-workspace-v1.js?v=2.4.7',
- './factory-os-dispatch-v1.js?v=2.4.7',
- './factory-os-dispatch-workspace-v1.js?v=2.4.7',
- './job-card-import-v13.js?v=2.4.7',
- './factory-os-office-intake-v1.js?v=2.4.7',
- './factory-os-home-v1.js?v=2.4.7',
- './factory-os-runtime-v5.js?v=2.4.7',
- './factory-os-stock-ledger-v1.js?v=2.4.7',
- './factory-os-stock-workspace-v1.js?v=2.4.7',
- './app-update.js?v=2.4.7'
+ './factory-os-app.css?v=2.4.8',
+ './db.js?v=2.4.8',
+ './shared-data-v9.js?v=2.4.8',
+ './factory-os-core-v1.js?v=2.4.8',
+ './factory-os-roles-v1.js?v=2.4.8',
+ './factory-os-demand-v1.js?v=2.4.8',
+ './factory-os-production-output-v1.js?v=2.4.8',
+ './factory-os-manufacturing-v1.js?v=2.4.8',
+ './factory-os-finishing-v1.js?v=2.4.8',
+ './factory-os-finishing-workspace-v1.js?v=2.4.8',
+ './factory-os-dispatch-v1.js?v=2.4.8',
+ './factory-os-dispatch-workspace-v1.js?v=2.4.8',
+ './job-card-import-v13.js?v=2.4.8',
+ './factory-os-office-intake-v1.js?v=2.4.8',
+ './factory-os-home-v1.js?v=2.4.8',
+ './factory-os-runtime-v5.js?v=2.4.8',
+ './factory-os-stock-ledger-v1.js?v=2.4.8',
+ './factory-os-stock-workspace-v1.js?v=2.4.8',
+ './app-update.js?v=2.4.8'
 ];
 async function precache(){const c=await caches.open(CACHE);for(const u of PRECACHE){try{const r=await fetch(u,{cache:'no-store'});if(r.ok)await c.put(u,r.clone())}catch{}}}
 self.addEventListener('install',e=>e.waitUntil((async()=>{await precache();await self.skipWaiting()})()));
