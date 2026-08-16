@@ -1,16 +1,12 @@
 /* Factory OS 2.10.4 — per-division daily work generated from the manager schedule. */
 (function(){'use strict';if(window.VUFactoryManufacturing)return;
-const safe=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[m])),DIVISIONS=['Casting','Packing','Resin'];let visibleAssigned=[];
+const safe=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])),DIVISIONS=['Casting','Packing','Resin'];let visibleAssigned=[];
 const n=v=>Math.max(0,Math.round(Number(v||0)));
 function priorityLabel(index){if(index===0)return'PRIORITY 1';if(index===1)return'PRIORITY 2';if(index===2)return'PRIORITY 3';return`Priority ${index+1}`}
 function allowedDivision(requested){const role=VUFactoryOS.role();if(role==='Management')return DIVISIONS.includes(requested)?requested:null;if(DIVISIONS.includes(role))return role;return null}
 function previewActive(){return !!window.VUManagementPreview?.isActive?.()}
 async function buildPreviewDivision(division,date=VUFactoryDailyProductionPlan.localDate()){
- const [rec,priority,txs]=await Promise.all([
-  VUFactoryProductionRecommendation.buildDivision(division,date),
-  VUFactoryProductionPriority.build(),
-  getAll('inventoryTransactions')
- ]);
+ const [rec,priority,txs]=await Promise.all([VUFactoryProductionRecommendation.buildDivision(division,date),VUFactoryProductionPriority.build(),getAll('inventoryTransactions')]);
  const queue=priority.byDivision[division]||[],queueMap=new Map(queue.map(r=>[VUFactoryDailyProductionPlan.lineKey(r),r])),doneMap=new Map();
  for(const t of txs){if(t?.type!=='PRODUCTION_OUTPUT'||String(t?.division||'')!==division||VUFactoryDailyProductionPlan.localDate(t.createdAt)!==date)continue;const k=`${String(t.orderId||'')}::${String(t.productId||'')}::${String(t.productCode||'').toUpperCase()}`;doneMap.set(k,(doneMap.get(k)||0)+n(t.quantityChange||t.quantity))}
  const assignments=(rec.assignments||[]).map(a=>{const current=queueMap.get(a.key),completed=Math.min(n(a.assignedQty),n(doneMap.get(a.key))),stillRequired=current?n(current.toMake):0,remaining=Math.min(Math.max(0,n(a.assignedQty)-completed),stillRequired);return{...a,current,completed,remaining,coveredByStock:Math.max(0,n(a.assignedQty)-completed-remaining)}}).filter(a=>a.completed>0||a.remaining>0||a.coveredByStock>0);
