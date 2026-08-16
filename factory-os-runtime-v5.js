@@ -1,12 +1,12 @@
 (function(){
 'use strict';
-const B='FACTORY-OS-2.10.2',$=s=>document.querySelector(s);
+const B='FACTORY-OS-2.10.4',$=s=>document.querySelector(s);
 
 Object.assign(window,{
   main:$('#main'),
   pageTitle:$('#pageTitle'),
   backBtn:$('#backBtn'),
-  esc:v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])),
+  esc:v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[m])),
   uid:p=>`${p}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`,
   money:v=>new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR',maximumFractionDigits:2}).format(Number(v||0)),
   notify:m=>{const t=$('#toast');if(!t)return;t.textContent=String(m??'');t.hidden=false;clearTimeout(window.__fosToast);window.__fosToast=setTimeout(()=>t.hidden=true,2200)},
@@ -14,142 +14,16 @@ Object.assign(window,{
   closeDialog:()=>{const d=$('#dialog');if(d?.open)d.close()}
 });
 
-async function load(src){
-  await new Promise((ok,no)=>{
-    const s=document.createElement('script');
-    s.src=src;
-    s.onload=ok;
-    s.onerror=()=>no(new Error(`Failed to load ${src}`));
-    document.body.appendChild(s);
-  });
-}
-
-async function loadStock(){
-  if(!window.VUFactoryStock)await load('factory-os-stock-ledger-v1.js?v=2.10.2');
-  if(!window.VUFactoryStockWorkspace)await load('factory-os-stock-workspace-v1.js?v=2.10.2');
-}
-
-const R={
-  dashboard:()=>VUFactoryOSHome.render(),
-  'shared-access':()=>VUSharedAccess.open(),
-  'manufacturing-casting':()=>VUFactoryManufacturing.open('Casting'),
-  'manufacturing-packing':()=>VUFactoryManufacturing.open('Packing'),
-  'manufacturing-resin':()=>VUFactoryManufacturing.open('Resin'),
-  'manufacturing-capacity':()=>VUFactoryCapacity.open(),
-  orders:()=>VUOfficeIntake.open(),
-  'order-intake':()=>VUOfficeIntake.open(),
-  'product-setup':()=>VUFactoryProductSetup.open(),
-  painting:()=>VUFactoryFinishingWorkspace.open(),
-  'delivery-calendar':()=>VUFactoryDeliveryCalendar.open(),
-  deliveries:()=>VUFactoryDispatchWorkspace.openDeliveries(),
-  'invoice-prep':()=>VUFactoryInvoicePrep.open(),
-  'dispatch-completion':()=>VUFactoryDispatchCompletion.open(),
-  collections:()=>VUFactoryDispatchWorkspace.openCollections(),
-  stock:()=>VUFactoryStockWorkspace.open(),
-  'print-centre':()=>VUFactoryPrintCentre.open(),
-  planning:()=>VUFactoryPlanning.open()
-};
-
-async function route(r){
-  const fn=R[r]||R.dashboard;
-  try{
-    await fn();
-    document.body.dataset.route=r;
-  }catch(e){
-    console.error(e);
-    notify(`Could not open ${r}: ${e?.message||e}`);
-    throw e;
-  }
-}
-window.navigate=route;
-
-function bind(){
-  if(localStorage.getItem('fos-theme')!=='light')document.documentElement.setAttribute('data-dark','');
-  $('#themeBtn')?.addEventListener('click',()=>{
-    const d=document.documentElement.toggleAttribute('data-dark');
-    localStorage.setItem('fos-theme',d?'dark':'light');
-  });
-  $('#backBtn')?.addEventListener('click',()=>route('dashboard'));
-  document.addEventListener('click',e=>{
-    const b=e.target.closest?.('[data-fos-action]');
-    if(!b)return;
-    e.preventDefault();
-    e.stopPropagation();
-    const a=b.dataset.fosAction;
-    const role=VUFactoryOS.role();
-    let target=a;
-    if(a==='division'){
-      target=role==='Painting'?'painting':role==='Casting'?'manufacturing-casting':role==='Packing'?'manufacturing-packing':role==='Resin'?'manufacturing-resin':null;
-    }
-    if(target&&R[target])route(target).catch(err=>notify(`Could not open section: ${err?.message||err}`));
-  },true);
-}
-
-let syncRefreshTimer=null;
-let pendingSyncRefresh=false;
-let lastRefreshSyncAt='';
-
-function editingInProgress(){
-  const d=$('#dialog');
-  if(d?.open)return true;
-  const a=document.activeElement;
-  if(!a)return false;
-  return /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)||a.isContentEditable;
-}
-
-function refreshCurrentRouteFromSync(detail={}){
-  if(!Number(detail.pulled||0))return;
-  if(detail.state!=='ready'&&detail.state!=='conflict')return;
-  const syncAt=String(detail.lastSyncAt||'');
-  if(syncAt&&syncAt===lastRefreshSyncAt)return;
-  if(syncAt)lastRefreshSyncAt=syncAt;
-  pendingSyncRefresh=true;
-  clearTimeout(syncRefreshTimer);
-  syncRefreshTimer=setTimeout(async()=>{
-    if(!pendingSyncRefresh)return;
-    if(editingInProgress())return;
-    pendingSyncRefresh=false;
-    const current=document.body.dataset.route||'dashboard';
-    if(current==='shared-access')return;
-    try{
-      await route(current);
-    }catch(e){
-      console.error('Automatic shared-data refresh failed',e);
-    }
-  },120);
-}
-
-window.addEventListener('vu:sync-status',e=>refreshCurrentRouteFromSync(e.detail||{}));
-document.addEventListener('focusout',()=>{
-  if(!pendingSyncRefresh)return;
-  clearTimeout(syncRefreshTimer);
-  syncRefreshTimer=setTimeout(()=>{
-    if(!pendingSyncRefresh||editingInProgress())return;
-    pendingSyncRefresh=false;
-    const current=document.body.dataset.route||'dashboard';
-    if(current!=='shared-access')route(current).catch(e=>console.error('Deferred shared-data refresh failed',e));
-  },100);
-});
-
-async function boot(){
-  const rb=$('#runtimeBuild');
-  if(rb)rb.textContent=B;
-  await loadStock();
-  await openDB();
-  await VUFactoryStock.migrateRawAliases();
-  await VUFactoryStock.recoverRawMigrationLoss();
-  await Promise.all(['products','customers','orders','inventoryBalances','inventoryTransactions','productionJobs','deliveries'].map(getAll));
-  await VUSharedAccess.init();
-  bind();
-  await route('dashboard');
-  $('#splash')?.remove();
-  $('#app')?.classList.remove('hidden');
-}
-
-window.addEventListener('DOMContentLoaded',()=>boot().catch(e=>{
-  console.error(e);
-  document.body.insertAdjacentHTML('afterbegin',`<div class="fatal">Factory OS could not start. No data was changed.<br><small>${window.esc(e.message||e)}</small></div>`);
-}),{once:true});
-
+async function load(src){await new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>no(new Error(`Failed to load ${src}`));document.body.appendChild(s)})}
+async function loadStock(){if(!window.VUFactoryStock)await load('factory-os-stock-ledger-v1.js?v=2.10.4');if(!window.VUFactoryStockWorkspace)await load('factory-os-stock-workspace-v1.js?v=2.10.4')}
+const R={dashboard:()=>VUFactoryOSHome.render(),'shared-access':()=>VUSharedAccess.open(),'manufacturing-casting':()=>VUFactoryManufacturing.open('Casting'),'manufacturing-packing':()=>VUFactoryManufacturing.open('Packing'),'manufacturing-resin':()=>VUFactoryManufacturing.open('Resin'),'manufacturing-capacity':()=>VUFactoryCapacity.open(),orders:()=>VUOfficeIntake.open(),'order-intake':()=>VUOfficeIntake.open(),'product-setup':()=>VUFactoryProductSetup.open(),painting:()=>VUFactoryFinishingWorkspace.open(),'delivery-calendar':()=>VUFactoryDeliveryCalendar.open(),deliveries:()=>VUFactoryDispatchWorkspace.openDeliveries(),'invoice-prep':()=>VUFactoryInvoicePrep.open(),'dispatch-completion':()=>VUFactoryDispatchCompletion.open(),collections:()=>VUFactoryDispatchWorkspace.openCollections(),stock:()=>VUFactoryStockWorkspace.open(),'print-centre':()=>VUFactoryPrintCentre.open(),planning:()=>VUFactoryPlanning.open()};
+async function route(r){const fn=R[r]||R.dashboard;try{await fn();document.body.dataset.route=r}catch(e){console.error(e);notify(`Could not open ${r}: ${e?.message||e}`);throw e}}window.navigate=route;
+function bind(){if(localStorage.getItem('fos-theme')!=='light')document.documentElement.setAttribute('data-dark','');$('#themeBtn')?.addEventListener('click',()=>{const d=document.documentElement.toggleAttribute('data-dark');localStorage.setItem('fos-theme',d?'dark':'light')});$('#backBtn')?.addEventListener('click',()=>route('dashboard'));document.addEventListener('click',e=>{const b=e.target.closest?.('[data-fos-action]');if(!b)return;e.preventDefault();e.stopPropagation();const a=b.dataset.fosAction;const role=VUFactoryOS.role();let target=a;if(a==='division'){target=role==='Painting'?'painting':role==='Casting'?'manufacturing-casting':role==='Packing'?'manufacturing-packing':role==='Resin'?'manufacturing-resin':null}if(target&&R[target])route(target).catch(err=>notify(`Could not open section: ${err?.message||err}`))},true)}
+let syncRefreshTimer=null,pendingSyncRefresh=false,lastRefreshSyncAt='';
+function editingInProgress(){const d=$('#dialog');if(d?.open)return true;const a=document.activeElement;if(!a)return false;return /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)||a.isContentEditable}
+function refreshCurrentRouteFromSync(detail={}){if(!Number(detail.pulled||0))return;if(detail.state!=='ready'&&detail.state!=='conflict')return;const syncAt=String(detail.lastSyncAt||'');if(syncAt&&syncAt===lastRefreshSyncAt)return;if(syncAt)lastRefreshSyncAt=syncAt;pendingSyncRefresh=true;clearTimeout(syncRefreshTimer);syncRefreshTimer=setTimeout(async()=>{if(!pendingSyncRefresh||editingInProgress())return;pendingSyncRefresh=false;const current=document.body.dataset.route||'dashboard';if(current==='shared-access')return;try{await route(current)}catch(e){console.error('Automatic shared-data refresh failed',e)}},120)}
+window.addEventListener('vu:sync-status',e=>refreshCurrentRouteFromSync(e.detail||{}));document.addEventListener('focusout',()=>{if(!pendingSyncRefresh)return;clearTimeout(syncRefreshTimer);syncRefreshTimer=setTimeout(()=>{if(!pendingSyncRefresh||editingInProgress())return;pendingSyncRefresh=false;const current=document.body.dataset.route||'dashboard';if(current!=='shared-access')route(current).catch(e=>console.error('Deferred shared-data refresh failed',e))},100)});
+async function boot(){const rb=$('#runtimeBuild');if(rb)rb.textContent=B;await loadStock();await openDB();await VUFactoryStock.migrateRawAliases();await VUFactoryStock.recoverRawMigrationLoss();await Promise.all(['products','customers','orders','inventoryBalances','inventoryTransactions','productionJobs','deliveries'].map(getAll));await VUSharedAccess.init();bind();await route('dashboard');$('#splash')?.remove();$('#app')?.classList.remove('hidden')}
+window.addEventListener('DOMContentLoaded',()=>boot().catch(e=>{console.error(e);document.body.insertAdjacentHTML('afterbegin',`<div class="fatal">Factory OS could not start. No data was changed.<br><small>${window.esc(e.message||e)}</small></div>`)}),{once:true});
 window.VUFactoryRuntime={version:B};
 })();
