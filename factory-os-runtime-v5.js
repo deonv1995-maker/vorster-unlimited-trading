@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const B='FACTORY-OS-2.10.1',$=s=>document.querySelector(s);
+const B='FACTORY-OS-2.10.2',$=s=>document.querySelector(s);
 
 Object.assign(window,{
   main:$('#main'),
@@ -25,8 +25,8 @@ async function load(src){
 }
 
 async function loadStock(){
-  if(!window.VUFactoryStock)await load('factory-os-stock-ledger-v1.js?v=2.10.1');
-  if(!window.VUFactoryStockWorkspace)await load('factory-os-stock-workspace-v1.js?v=2.10.1');
+  if(!window.VUFactoryStock)await load('factory-os-stock-ledger-v1.js?v=2.10.2');
+  if(!window.VUFactoryStockWorkspace)await load('factory-os-stock-workspace-v1.js?v=2.10.2');
 }
 
 const R={
@@ -75,8 +75,13 @@ function bind(){
     if(!b)return;
     e.preventDefault();
     e.stopPropagation();
-    const a=b.dataset.fosAction,r=VUFactoryOS.role(),task=a==='division'?(r==='Painting'?()=>VUFactoryFinishingWorkspace.open():()=>VUFactoryManufacturing.open(r)):R[a];
-    if(task)Promise.resolve().then(task).catch(err=>notify(`Could not open section: ${err?.message||err}`));
+    const a=b.dataset.fosAction;
+    const role=VUFactoryOS.role();
+    let target=a;
+    if(a==='division'){
+      target=role==='Painting'?'painting':role==='Casting'?'manufacturing-casting':role==='Packing'?'manufacturing-packing':role==='Resin'?'manufacturing-resin':null;
+    }
+    if(target&&R[target])route(target).catch(err=>notify(`Could not open section: ${err?.message||err}`));
   },true);
 }
 
