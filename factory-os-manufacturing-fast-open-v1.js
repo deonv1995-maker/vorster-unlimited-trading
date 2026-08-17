@@ -1,24 +1,12 @@
-/* Factory OS 2.10.37 — fast local-first manufacturing open, post-sync refresh, and one-time Casting plan reset for 2026-08-17. */
+/* Factory OS 2.10.38 — fast local-first manufacturing open with authoritative post-sync plan recovery. */
 (function(){
 'use strict';
 if(window.VUFactoryManufacturingFastOpen||!window.VUFactoryManufacturing)return;
 const DIVISIONS=new Set(['Casting','Packing','Resin']);
-const RESET_DATE='2026-08-17',RESET_KEY='vu-casting-plan-reset-2026-08-17-v1';
 const originalOpen=window.VUFactoryManufacturing.open.bind(window.VUFactoryManufacturing);
 let backgroundTimer=null,refreshing=false;
 function actualRole(){return window.VUManagementPreview?.actualRole?.()||window.VUFactoryOS?.role?.()||''}
 function divisionDevice(){return DIVISIONS.has(actualRole())&&!window.VUManagementPreview?.isActive?.()}
-async function resetCastingPlanIfRequested(division){
- if(division!=='Casting'||actualRole()!=='Casting'||localStorage.getItem(RESET_KEY)==='done')return false;
- const planApi=window.VUFactoryDailyProductionPlan;if(!planApi||planApi.localDate()!==RESET_DATE)return false;
- const id=planApi.planId('Casting',RESET_DATE),current=await window.getOne('productionJobs',id),now=new Date().toISOString();
- if(current){
-  await window.putOne('productionJobs',{...current,listNumber:1,scheduleFingerprint:`FORCE-RESET-${now}`,updatedAt:now,updatedByRole:'Factory OS reset'});
- }else{
-  await window.putOne('productionJobs',{id,kind:'FACTORY_DAILY_PRODUCTION_PLAN',date:RESET_DATE,division:'Casting',requestedTarget:0,assignedTarget:0,unfilledTarget:0,assignments:[],planSource:'MANAGER_SCHEDULE',scheduleFingerprint:`FORCE-RESET-${now}`,listNumber:1,createdAt:now,generatedAt:now,updatedAt:now,updatedByRole:'Factory OS reset'});
- }
- localStorage.setItem(RESET_KEY,'done');return true;
-}
 async function openLocal(division){
  const access=window.VUSharedAccess,membership=access?.membership;let suppressed=false;
  try{
@@ -26,21 +14,39 @@ async function openLocal(division){
   await originalOpen(division);
  }finally{if(suppressed)access.membership=membership}
 }
+async function discardObsoleteResetMutation(division){
+ const planApi=window.VUFactoryDailyProductionPlan;if(!planApi)return false;
+ const date=planApi.localDate(),id=planApi.planId(division,date),outboxId=`productionJobs|${id}`;
+ const pending=await window.VUDbRawGetOne?.('syncOutbox',outboxId);
+ const local=await window.getOne?.('productionJobs',id);
+ const resetTagged=String(pending?.payload?.updatedByRole||local?.updatedByRole||'').toLowerCase().includes('factory os reset')||String(pending?.payload?.scheduleFingerprint||local?.scheduleFingerprint||'').startsWith('FORCE-RESET-');
+ if(!resetTagged)return false;
+ await window.VUDbRawDelete?.('syncOutbox',outboxId);
+ await window.VUDbRawDelete?.('syncConflicts',outboxId);
+ return true;
+}
 async function backgroundSync(division){
  if(!navigator.onLine||!window.VUSharedAccess?.membership?.())return;
  try{
   await window.VUFactoryManufacturing.queueMissingTodayOutput?.(division);
-  const result=await window.VUSharedAccess.sync({reason:`${String(division).toLowerCase()}-workstation-background-open`});
+  await discardObsoleteResetMutation(division);
+  let result=await window.VUSharedAccess.sync({reason:`${String(division).toLowerCase()}-workstation-authoritative-refresh`,resetPull:true});
   if(result?.state==='error'){console.warn('Background production sync failed',result.message);return}
+  const before=await window.VUFactoryDailyProductionPlan?.get?.(division);
+  const rebuilt=await window.VUFactoryProductionRecommendation?.ensureDivision?.(division);
+  const changed=before?.updatedAt!==rebuilt?.updatedAt||before?.scheduleFingerprint!==rebuilt?.scheduleFingerprint||Number(before?.assignedTarget||0)!==Number(rebuilt?.assignedTarget||0);
+  if(changed&&window.VUSharedAccess?.membership?.()){
+   result=await window.VUSharedAccess.sync({reason:`${String(division).toLowerCase()}-workstation-plan-recovered`});
+   if(result?.state==='error')console.warn('Recovered production plan sync failed',result.message);
+  }
   if(refreshing)return;refreshing=true;try{await openLocal(division)}finally{refreshing=false}
  }catch(e){console.warn('Background production refresh failed',e)}
 }
 async function fastOpen(division){
  if(!divisionDevice())return originalOpen(division);
- try{await resetCastingPlanIfRequested(division)}catch(e){console.warn('Casting plan reset failed',e)}
  await openLocal(division);
  clearTimeout(backgroundTimer);backgroundTimer=setTimeout(()=>backgroundSync(division),80);
 }
 window.VUFactoryManufacturing.open=fastOpen;
-window.VUFactoryManufacturingFastOpen={version:'2.10.37',open:fastOpen,backgroundSync,openLocal,resetCastingPlanIfRequested};
+window.VUFactoryManufacturingFastOpen={version:'2.10.38',open:fastOpen,backgroundSync,openLocal,discardObsoleteResetMutation};
 })();
