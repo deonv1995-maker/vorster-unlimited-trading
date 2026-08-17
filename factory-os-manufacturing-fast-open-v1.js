@@ -1,12 +1,35 @@
-/* Factory OS 2.10.39 — low-data local-first manufacturing open with delta-sync recovery. */
+/* Factory OS 2.10.41 — low-data local-first manufacturing open with one-time local Casting list rebuild. */
 (function(){
 'use strict';
 if(window.VUFactoryManufacturingFastOpen||!window.VUFactoryManufacturing)return;
 const DIVISIONS=new Set(['Casting','Packing','Resin']);
+const CASTING_RESET_DATE='2026-08-17';
+const CASTING_RESET_KEY='vu-casting-local-list-rebuild-2026-08-17-v2';
 const originalOpen=window.VUFactoryManufacturing.open.bind(window.VUFactoryManufacturing);
 let backgroundTimer=null,refreshing=false,lastBackgroundSyncAt=0;
 function actualRole(){return window.VUManagementPreview?.actualRole?.()||window.VUFactoryOS?.role?.()||''}
 function divisionDevice(){return DIVISIONS.has(actualRole())&&!window.VUManagementPreview?.isActive?.()}
+async function rebuildCastingListLocallyOnce(division){
+ if(division!=='Casting'||actualRole()!=='Casting'||localStorage.getItem(CASTING_RESET_KEY)==='done')return false;
+ const planApi=window.VUFactoryDailyProductionPlan;
+ if(!planApi||planApi.localDate()!==CASTING_RESET_DATE)return false;
+ const id=planApi.planId('Casting',CASTING_RESET_DATE),outboxId=`productionJobs|${id}`;
+ /* This repair is deliberately local-only. It clears the stale plan on the Casting leader's
+    phone and rebuilds List 1 from the order/delivery/capacity data already present on that phone.
+    Existing PRODUCTION_OUTPUT transactions are untouched, and no reset/delete is published. */
+ window.VUSyncSuspendDepth=(window.VUSyncSuspendDepth||0)+1;
+ try{
+  await window.VUDbRawDelete?.('productionJobs',id);
+  await window.VUDbRawDelete?.('syncOutbox',outboxId);
+  await window.VUDbRawDelete?.('syncConflicts',outboxId);
+  const rebuilt=await window.VUFactoryProductionRecommendation?.ensureDivision?.('Casting',CASTING_RESET_DATE);
+  if(!rebuilt?.assignments?.length)throw new Error('Casting list rebuild returned no work items.');
+ }finally{
+  window.VUSyncSuspendDepth=Math.max(0,(window.VUSyncSuspendDepth||1)-1);
+ }
+ localStorage.setItem(CASTING_RESET_KEY,'done');
+ return true;
+}
 async function openLocal(division){
  const access=window.VUSharedAccess,membership=access?.membership;let suppressed=false;
  try{
@@ -27,31 +50,21 @@ async function discardObsoleteResetMutation(division){
 }
 async function backgroundSync(division,{force=false}={}){
  if(!navigator.onLine||!window.VUSharedAccess?.membership?.())return;
- const now=Date.now();
- if(!force&&now-lastBackgroundSyncAt<60000)return;
- lastBackgroundSyncAt=now;
+ const now=Date.now();if(!force&&now-lastBackgroundSyncAt<60000)return;lastBackgroundSyncAt=now;
  try{
   await window.VUFactoryManufacturing.queueMissingTodayOutput?.(division);
   const hadObsoleteReset=await discardObsoleteResetMutation(division);
-  /* Normal workstation refresh is incremental. A full pull is used only once when repairing
-     the known obsolete reset record, never on every page open. */
   let result=await window.VUSharedAccess.sync({reason:`${String(division).toLowerCase()}-workstation-delta-refresh`,resetPull:hadObsoleteReset});
   if(result?.state==='error'){console.warn('Background production sync failed',result.message);return}
-  const before=await window.VUFactoryDailyProductionPlan?.get?.(division);
-  const rebuilt=await window.VUFactoryProductionRecommendation?.ensureDivision?.(division);
-  const changed=before?.updatedAt!==rebuilt?.updatedAt||before?.scheduleFingerprint!==rebuilt?.scheduleFingerprint||Number(before?.assignedTarget||0)!==Number(rebuilt?.assignedTarget||0);
-  if(changed&&window.VUSharedAccess?.membership?.()){
-   result=await window.VUSharedAccess.sync({reason:`${String(division).toLowerCase()}-workstation-plan-recovered`});
-   if(result?.state==='error')console.warn('Recovered production plan sync failed',result.message);
-  }
   if(refreshing)return;refreshing=true;try{await openLocal(division)}finally{refreshing=false}
  }catch(e){console.warn('Background production refresh failed',e)}
 }
 async function fastOpen(division){
  if(!divisionDevice())return originalOpen(division);
+ try{await rebuildCastingListLocallyOnce(division)}catch(e){console.warn('Local Casting list rebuild failed',e)}
  await openLocal(division);
  clearTimeout(backgroundTimer);backgroundTimer=setTimeout(()=>backgroundSync(division),250);
 }
 window.VUFactoryManufacturing.open=fastOpen;
-window.VUFactoryManufacturingFastOpen={version:'2.10.39',open:fastOpen,backgroundSync,openLocal,discardObsoleteResetMutation};
+window.VUFactoryManufacturingFastOpen={version:'2.10.41',open:fastOpen,backgroundSync,openLocal,discardObsoleteResetMutation,rebuildCastingListLocallyOnce};
 })();
