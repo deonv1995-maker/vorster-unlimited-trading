@@ -1,11 +1,11 @@
-/* Factory OS 2.6.5 — plan-vs-actual production performance and carry-forward source. */
+/* Factory OS 2.10.18 — plan-vs-actual production performance and carry-forward source. */
 (function(){'use strict';if(window.VUFactoryProductionPerformance)return;
 const DIVISIONS=['Casting','Packing','Resin'],n=v=>Math.max(0,Math.round(Number(v||0)));
 const localDate=(v=new Date())=>VUFactoryDailyProductionPlan.localDate(v);
 function previousWorkingDay(date=localDate()){let d=new Date(`${date}T12:00:00`);do{d.setDate(d.getDate()-1)}while(d.getDay()===0||d.getDay()===6);return localDate(d)}
-async function transactions(division,date){const rows=await getAll('inventoryTransactions');return rows.filter(t=>t?.type==='PRODUCTION_OUTPUT'&&String(t?.division||'')===division&&localDate(t.createdAt)===date)}
-function completedByKey(rows){const m=new Map();for(const t of rows){const k=`${String(t.orderId||'')}::${String(t.productId||'')}::${String(t.productCode||'').toUpperCase()}`;m.set(k,(m.get(k)||0)+n(t.quantityChange||t.quantity))}return m}
+async function transactions(division,date){const rows=await getAll('inventoryTransactions');return rows.filter(t=>t?.type==='PRODUCTION_OUTPUT'&&String(t?.division||'')===division&&String(t.workDate||localDate(t.createdAt))===date)}
+function completedByKey(rows){const m=new Map();for(const t of rows){const k=String(t?.workKey||'').trim()||`${String(t.orderId||'')}::${String(t.productId||'')}::${String(t.productCode||'').toUpperCase()}`;m.set(k,(m.get(k)||0)+n(t.quantityChange||t.quantity))}return m}
 async function day(division,date){const [plan,tx]=await Promise.all([VUFactoryDailyProductionPlan.get(division,date),transactions(division,date)]),done=completedByKey(tx),assignments=(plan?.assignments||[]).map(a=>{const planned=n(a.assignedQty),completed=Math.min(planned,n(done.get(a.key))),shortfall=Math.max(0,planned-completed);return{...a,planned,completed,shortfall}}),planned=assignments.reduce((s,a)=>s+a.planned,0),completed=assignments.reduce((s,a)=>s+a.completed,0),shortfall=Math.max(0,planned-completed),actualTotal=tx.reduce((s,t)=>s+n(t.quantityChange||t.quantity),0);return{date,division,plan,assignments,planned,completed,shortfall,actualTotal,completionPercent:planned?Math.min(100,Math.round(completed/planned*100)):0}}
 async function previous(division,date=localDate()){return day(division,previousWorkingDay(date))}
 async function previousAll(date=localDate()){const previousDate=previousWorkingDay(date),divisions={};for(const d of DIVISIONS)divisions[d]=await day(d,previousDate);return{date:previousDate,divisions,planned:DIVISIONS.reduce((s,d)=>s+divisions[d].planned,0),completed:DIVISIONS.reduce((s,d)=>s+divisions[d].completed,0),shortfall:DIVISIONS.reduce((s,d)=>s+divisions[d].shortfall,0)}}
-window.VUFactoryProductionPerformance={version:'2.6.5',DIVISIONS,previousWorkingDay,transactions,completedByKey,day,previous,previousAll};})();
+window.VUFactoryProductionPerformance={version:'2.10.18',DIVISIONS,previousWorkingDay,transactions,completedByKey,day,previous,previousAll};})();
