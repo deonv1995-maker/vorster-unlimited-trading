@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const B='FACTORY-OS-2.10.23',$=s=>document.querySelector(s);
+const B='FACTORY-OS-2.10.24',$=s=>document.querySelector(s);
 Object.assign(window,{main:$('#main'),pageTitle:$('#pageTitle'),backBtn:$('#backBtn'),esc:v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[m])),uid:p=>`${p}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`,money:v=>new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR',maximumFractionDigits:2}).format(Number(v||0)),notify:m=>{const t=$('#toast');if(!t)return;t.textContent=String(m??'');t.hidden=false;clearTimeout(window.__fosToast);window.__fosToast=setTimeout(()=>t.hidden=true,2200)},openDialog:h=>{const d=$('#dialog');if(d){d.innerHTML=h;d.showModal()}},closeDialog:()=>{const d=$('#dialog');if(d?.open)d.close()}});
 async function load(src){await new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>no(new Error(`Failed to load ${src}`));document.body.appendChild(s)})}
 async function loadStock(){if(!window.VUFactoryStock)await load('factory-os-stock-ledger-v1.js?v=2.10.19');if(!window.VUFactoryStockWorkspace)await load('factory-os-stock-workspace-v1.js?v=2.10.19');if(!window.VUFactoryProductDivisionEditor)await load('factory-os-product-division-editor-v1.js?v=2.10.19')}
