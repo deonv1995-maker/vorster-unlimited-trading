@@ -1,10 +1,10 @@
-/* Factory OS 2.10.38 — fast local-first manufacturing open with authoritative post-sync plan recovery. */
+/* Factory OS 2.10.39 — low-data local-first manufacturing open with delta-sync recovery. */
 (function(){
 'use strict';
 if(window.VUFactoryManufacturingFastOpen||!window.VUFactoryManufacturing)return;
 const DIVISIONS=new Set(['Casting','Packing','Resin']);
 const originalOpen=window.VUFactoryManufacturing.open.bind(window.VUFactoryManufacturing);
-let backgroundTimer=null,refreshing=false;
+let backgroundTimer=null,refreshing=false,lastBackgroundSyncAt=0;
 function actualRole(){return window.VUManagementPreview?.actualRole?.()||window.VUFactoryOS?.role?.()||''}
 function divisionDevice(){return DIVISIONS.has(actualRole())&&!window.VUManagementPreview?.isActive?.()}
 async function openLocal(division){
@@ -25,12 +25,17 @@ async function discardObsoleteResetMutation(division){
  await window.VUDbRawDelete?.('syncConflicts',outboxId);
  return true;
 }
-async function backgroundSync(division){
+async function backgroundSync(division,{force=false}={}){
  if(!navigator.onLine||!window.VUSharedAccess?.membership?.())return;
+ const now=Date.now();
+ if(!force&&now-lastBackgroundSyncAt<60000)return;
+ lastBackgroundSyncAt=now;
  try{
   await window.VUFactoryManufacturing.queueMissingTodayOutput?.(division);
-  await discardObsoleteResetMutation(division);
-  let result=await window.VUSharedAccess.sync({reason:`${String(division).toLowerCase()}-workstation-authoritative-refresh`,resetPull:true});
+  const hadObsoleteReset=await discardObsoleteResetMutation(division);
+  /* Normal workstation refresh is incremental. A full pull is used only once when repairing
+     the known obsolete reset record, never on every page open. */
+  let result=await window.VUSharedAccess.sync({reason:`${String(division).toLowerCase()}-workstation-delta-refresh`,resetPull:hadObsoleteReset});
   if(result?.state==='error'){console.warn('Background production sync failed',result.message);return}
   const before=await window.VUFactoryDailyProductionPlan?.get?.(division);
   const rebuilt=await window.VUFactoryProductionRecommendation?.ensureDivision?.(division);
@@ -45,8 +50,8 @@ async function backgroundSync(division){
 async function fastOpen(division){
  if(!divisionDevice())return originalOpen(division);
  await openLocal(division);
- clearTimeout(backgroundTimer);backgroundTimer=setTimeout(()=>backgroundSync(division),80);
+ clearTimeout(backgroundTimer);backgroundTimer=setTimeout(()=>backgroundSync(division),250);
 }
 window.VUFactoryManufacturing.open=fastOpen;
-window.VUFactoryManufacturingFastOpen={version:'2.10.38',open:fastOpen,backgroundSync,openLocal,discardObsoleteResetMutation};
+window.VUFactoryManufacturingFastOpen={version:'2.10.39',open:fastOpen,backgroundSync,openLocal,discardObsoleteResetMutation};
 })();
