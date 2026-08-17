@@ -1,4 +1,4 @@
-/* Factory OS 2.10.18 — dedicated daily workstation for Casting, Packing and Resin. */
+/* Factory OS 2.10.31 — dedicated daily workstation for Casting, Packing and Resin with authoritative production sync. */
 (function(){'use strict';if(window.VUFactoryManufacturing)return;
 const safe=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const DIVISIONS=['Casting','Packing','Resin'];
@@ -8,8 +8,37 @@ function keyOf(a){return String(a.key||`${a.orderId||''}::${a.productId||''}::${
 function priorityLabel(index){return index<3?`PRIORITY ${index+1}`:`Priority ${index+1}`}
 function allowedDivision(requested){const role=VUFactoryOS.role();if(role==='Management')return DIVISIONS.includes(requested)?requested:null;if(DIVISIONS.includes(role))return role;return null}
 function previewActive(){return !!window.VUManagementPreview?.isActive?.()}
-function realDivisionDevice(){return DIVISIONS.includes(window.VUManagementPreview?.actualRole?.()||VUFactoryOS.role())&&!previewActive()}
-async function buildPreviewDivision(division,date=VUFactoryDailyProductionPlan.localDate()){
+function actualRole(){return window.VUManagementPreview?.actualRole?.()||VUFactoryOS.role()}
+function realDivisionDevice(){return DIVISIONS.includes(actualRole())&&!previewActive()}
+function localDate(){return VUFactoryDailyProductionPlan.localDate()}
+async function queueMissingTodayOutput(division,date=localDate()){
+ if(!window.VUSharedAccess?.membership?.())return 0;
+ const txs=(await getAll('inventoryTransactions')).filter(t=>t?.type==='PRODUCTION_OUTPUT'&&String(t?.division||'')===division&&String(t.workDate||localDate(t.createdAt))===date);
+ let queued=0;
+ for(const tx of txs){
+  if(!tx?.id)continue;
+  const id=`inventoryTransactions|${tx.id}`;
+  const [pending,meta]=await Promise.all([VUDbRawGetOne('syncOutbox',id),VUDbRawGetOne('syncMeta',id)]);
+  if(pending||Number(meta?.revision||0)>0)continue;
+  await VUDbRawPut('syncOutbox',{id,store:'inventoryTransactions',recordId:String(tx.id),operation:'put',payload:tx,baseRevision:0,createdAt:new Date().toISOString(),deviceId:VUDeviceId(),attempts:0});
+  queued++;
+ }
+ return queued;
+}
+async function syncBeforeBuild(division){
+ if(!window.VUSharedAccess?.membership?.()||!navigator.onLine)return;
+ const role=actualRole();
+ if(DIVISIONS.includes(role))await queueMissingTodayOutput(role);
+ const result=await VUSharedAccess.sync({reason:`${String(division).toLowerCase()}-daily-open`,resetPull:role==='Management'});
+ if(result?.state==='error')console.warn('Production refresh sync failed',result.message);
+}
+async function syncAfterSave(division){
+ if(!window.VUSharedAccess?.membership?.()||!navigator.onLine)return;
+ await queueMissingTodayOutput(division,currentDaily?.date||localDate());
+ const result=await VUSharedAccess.sync({reason:`${String(division).toLowerCase()}-daily-save`});
+ if(result?.state==='error')throw new Error(`Production was saved on this device, but shared sync failed: ${result.message||'unknown sync error'}`);
+}
+async function buildPreviewDivision(division,date=localDate()){
  const [rec,priority,txs]=await Promise.all([VUFactoryProductionRecommendation.buildDivision(division,date),VUFactoryProductionPriority.build(),getAll('inventoryTransactions')]);
  const queue=priority.byDivision[division]||[],queueMap=new Map(queue.map(r=>[VUFactoryDailyProductionPlan.lineKey(r),r])),doneMap=new Map();
  for(const t of txs){if(t?.type!=='PRODUCTION_OUTPUT'||String(t?.division||'')!==division||String(t.workDate||VUFactoryDailyProductionPlan.localDate(t.createdAt))!==date)continue;const k=String(t?.workKey||'').trim()||`${String(t.orderId||'')}::${String(t.productId||'')}::${String(t.productCode||'').toUpperCase()}`;doneMap.set(k,(doneMap.get(k)||0)+n(t.quantityChange||t.quantity))}
@@ -30,15 +59,17 @@ async function saveDaily(){
  const btn=document.getElementById('fosDailySave');if(btn)btn.disabled=true;
  let saved=0;
  try{
-  for(const a of chosen){const qty=draftQty(a);if(!qty)continue;await VUFactoryProductionOutput.record({...a,division:currentDivision,toMake:a.remaining,workKey:keyOf(a),workDate:currentDaily?.date||VUFactoryDailyProductionPlan.localDate()},qty,'Daily division batch capture');saved+=qty;draft.delete(keyOf(a))}
-  window.notify(`${saved} ${currentDivision.toLowerCase()} unit${saved===1?'':'s'} saved`);
+  for(const a of chosen){const qty=draftQty(a);if(!qty)continue;await VUFactoryProductionOutput.record({...a,division:currentDivision,toMake:a.remaining,workKey:keyOf(a),workDate:currentDaily?.date||localDate()},qty,'Daily division batch capture');saved+=qty;draft.delete(keyOf(a))}
+  await syncAfterSave(currentDivision);
+  window.notify(`${saved} ${currentDivision.toLowerCase()} unit${saved===1?'':'s'} saved and synced`);
   await open(currentDivision);
-  if(window.VUSharedAccess?.membership?.()&&navigator.onLine){VUSharedAccess.sync({reason:`${String(currentDivision).toLowerCase()}-daily-save`}).catch(e=>console.warn('Production save sync failed',e))}
- }catch(err){window.alert(`${saved?`${saved} unit${saved===1?'':'s'} saved before an error occurred. `:''}${err?.message||String(err)}`);await open(currentDivision)}
+ }catch(err){window.alert(`${saved?`${saved} unit${saved===1?'':'s'} saved locally. `:''}${err?.message||String(err)}`);await open(currentDivision)}
 }
 async function open(requestedDivision){
  const division=allowedDivision(requestedDivision);if(!division)throw new Error('This device does not have access to that manufacturing division.');
- currentDivision=division;let daily;if(previewActive())daily=await buildPreviewDivision(division);else{await VUFactoryProductionRecommendation.ensureDivision(division);daily=await VUFactoryDailyProductionPlan.buildDivision(division)}currentDaily=daily;
+ currentDivision=division;
+ try{await syncBeforeBuild(division)}catch(e){console.warn('Production pre-read sync failed',e)}
+ let daily;if(previewActive())daily=await buildPreviewDivision(division);else{await VUFactoryProductionRecommendation.ensureDivision(division);daily=await VUFactoryDailyProductionPlan.buildDivision(division)}currentDaily=daily;
  visibleAssigned=daily.assignments.filter(a=>n(a.remaining)>0).map(a=>({...a,division,toMake:a.remaining,workKey:keyOf(a),workDate:daily.date}));
  const live=new Set(visibleAssigned.map(keyOf));for(const k of [...draft.keys()])if(!live.has(k))draft.delete(k);
  pageTitle.textContent=`Today’s ${division}`;if(realDivisionDevice())backBtn.classList.add('hidden');else backBtn.classList.remove('hidden');
@@ -48,4 +79,4 @@ async function open(requestedDivision){
  bindSteppers();const save=document.getElementById('fosDailySave');if(save)save.onclick=saveDaily
 }
 function style(){if(document.getElementById('fosManufacturingStyle'))return;const s=document.createElement('style');s.id='fosManufacturingStyle';s.textContent='.fos-daily-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.fos-daily-summary>div{padding:11px;border:1px solid var(--line);border-radius:12px}.fos-daily-summary span,.fos-daily-summary small,.fos-daily-row span,.fos-daily-row small{display:block;color:var(--muted);font-size:.78rem}.fos-daily-summary strong{font-size:1.35rem}.fos-daily-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:15px 0;border-top:1px solid var(--line)}.fos-daily-row:first-of-type{border-top:0}.fos-daily-info strong{display:block;font-size:1.02rem}.fos-priority-tag{font-size:.69rem;font-weight:800;letter-spacing:.06em;color:var(--muted);margin-bottom:4px}.fos-daily-required{text-align:right}.fos-daily-required b{display:block;font-size:1.25rem}.fos-daily-stepper{grid-column:1/-1;display:grid;grid-template-columns:48px minmax(70px,1fr) 48px;gap:7px;align-items:center}.fos-daily-stepper input{width:100%;box-sizing:border-box;text-align:center;border:1px solid var(--line);border-radius:11px;background:var(--panel);color:var(--text);padding:11px 5px;font:inherit;font-size:1.1rem;font-weight:700}.fos-work-all{grid-column:1/-1;border:0;background:transparent;color:var(--accent);font-weight:700;padding:7px}.fos-daily-stepper.is-preview{opacity:.55}.fos-daily-savebar{position:sticky;bottom:max(10px,env(safe-area-inset-bottom));z-index:20;display:grid;grid-template-columns:auto minmax(180px,1fr);gap:10px;align-items:center;margin:14px 10px 18px;padding:10px 12px;border:1px solid var(--line);border-radius:16px;background:var(--panel);box-shadow:0 8px 28px rgba(0,0,0,.16)}.fos-daily-savebar span{color:var(--muted);font-size:.82rem}.fos-daily-savebar button:disabled{opacity:.45}@media(max-width:520px){.fos-daily-row{grid-template-columns:1fr auto}.fos-daily-savebar{grid-template-columns:1fr}.fos-daily-savebar button{width:100%}}';document.head.appendChild(s)}
-style();window.VUFactoryManufacturing={version:'2.10.18',open,allowedDivision,buildPreviewDivision};})();
+style();window.VUFactoryManufacturing={version:'2.10.31',open,allowedDivision,buildPreviewDivision,queueMissingTodayOutput};})();
