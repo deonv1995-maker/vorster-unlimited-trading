@@ -17,7 +17,6 @@ window.VUQueueLocalMutation=queueLocalMutation;
 async function enqueueSyncMutation(store,recordId,operation,payload){if(!VU_SYNCABLE_STORES.has(store)||window.VUSyncSuspendDepth>0||recordId===undefined||recordId===null)return;const key=`${store}|${recordId}`,meta=await rawGetOne('syncMeta',key),mutation={id:key,store,recordId:String(recordId),operation,payload:operation==='delete'?null:payload,baseRevision:Number(meta?.revision||0),createdAt:new Date().toISOString(),deviceId:vuDeviceId(),attempts:0};await rawPutOne('syncOutbox',mutation);queueLocalMutation(store,recordId)}
 window.VUEnqueueSyncMutation=enqueueSyncMutation;
 async function getAll(store){return rawGetAll(store)}async function getOne(store,id){return rawGetOne(store,id)}
-function assertPreviewWritable(){window.VUManagementPreview?.assertWritable?.()}
-async function putOne(store,value){assertPreviewWritable();const result=await rawPutOne(store,value);if(value&&value.id!==undefined)await enqueueSyncMutation(store,value.id,'put',value);return result}
-async function deleteOne(store,id){assertPreviewWritable();await rawDeleteOne(store,id);await enqueueSyncMutation(store,id,'delete',null)}
-async function clearStore(store){assertPreviewWritable();const db=await openDB();return new Promise((resolve,reject)=>{const tx=db.transaction(store,"readwrite");tx.objectStore(store).clear();tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})}
+async function putOne(store,value){const result=await rawPutOne(store,value);if(value&&value.id!==undefined)await enqueueSyncMutation(store,value.id,'put',value);return result}
+async function deleteOne(store,id){await rawDeleteOne(store,id);await enqueueSyncMutation(store,id,'delete',null)}
+async function clearStore(store){const db=await openDB();return new Promise((resolve,reject)=>{const tx=db.transaction(store,"readwrite");tx.objectStore(store).clear();tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})}

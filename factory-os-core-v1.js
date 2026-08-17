@@ -7,8 +7,7 @@ const ROLES=Object.freeze({MANAGEMENT:'Management',OFFICE:'Office',CASTING:'Cast
 const ROLE_KEY='vu-factory-os-role';
 const DEFAULTS=Object.freeze({vehicleCount:2,vehiclePlanningLow:15000,vehiclePlanningHigh:30000,dailyDispatchMinimum:21000,dailyProfitTarget:31000,allowPartialDispatch:true});
 const money=n=>Number(n||0);
-const actualRole=()=>window.VUSharedAccess?.currentRole?.()||localStorage.getItem(ROLE_KEY)||ROLES.MANAGEMENT;
-const role=()=>window.VUManagementPreview?.role?.()||actualRole();
+const role=()=>window.VUSharedAccess?.currentRole?.()||localStorage.getItem(ROLE_KEY)||ROLES.MANAGEMENT;
 const setRole=value=>{if(!Object.values(ROLES).includes(value))throw new Error('Unknown Factory OS role');if(window.VUSharedAccess?.membership?.())throw new Error('This device role is controlled by Shared Access Management.');localStorage.setItem(ROLE_KEY,value)};
 const settings=async()=>{const row=await getOne('settings','factory-os-operating');return{...DEFAULTS,...(row||{})}};
 const saveSettings=async patch=>putOne('settings',{id:'factory-os-operating',...(await settings()),...patch,updatedAt:new Date().toISOString()});
@@ -37,5 +36,5 @@ function requirements(snapshotData){
 
 function dispatchHealth(plannedValue,cfg=DEFAULTS){const value=money(plannedValue);return{value,belowMinimum:value<cfg.dailyDispatchMinimum,belowProfitTarget:value<cfg.dailyProfitTarget,minimumGap:Math.max(0,cfg.dailyDispatchMinimum-value),profitTargetGap:Math.max(0,cfg.dailyProfitTarget-value)}};
 
-window.VUFactoryOS={version:'1.2.0',ROLES,DEFAULTS,role,actualRole,setRole,settings,saveSettings,snapshot,requirements,dispatchHealth,orderRemainingValue,lineRequired};
+window.VUFactoryOS={version:'1.1.0',ROLES,DEFAULTS,role,setRole,settings,saveSettings,snapshot,requirements,dispatchHealth,orderRemainingValue,lineRequired};
 })();
