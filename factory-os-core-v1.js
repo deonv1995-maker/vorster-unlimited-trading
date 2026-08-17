@@ -1,4 +1,4 @@
-/* Factory OS v1 — stable domain core. Keeps existing IndexedDB data intact. */
+/* Factory OS 2.10.43 — stable domain core with fail-closed role resolution. Keeps existing IndexedDB data intact. */
 (function(){
 'use strict';
 if(window.VUFactoryOS)return;
@@ -7,7 +7,8 @@ const ROLES=Object.freeze({MANAGEMENT:'Management',OFFICE:'Office',CASTING:'Cast
 const ROLE_KEY='vu-factory-os-role';
 const DEFAULTS=Object.freeze({vehicleCount:2,vehiclePlanningLow:15000,vehiclePlanningHigh:30000,dailyDispatchMinimum:21000,dailyProfitTarget:31000,allowPartialDispatch:true});
 const money=n=>Number(n||0);
-const actualRole=()=>window.VUSharedAccess?.currentRole?.()||localStorage.getItem(ROLE_KEY)||ROLES.MANAGEMENT;
+/* Never default an unresolved/shared staff device to Management. Management must be explicitly resolved from Shared Access or local configuration. */
+const actualRole=()=>window.VUSharedAccess?.currentRole?.()||localStorage.getItem(ROLE_KEY)||ROLES.OFFICE;
 const role=()=>window.VUManagementPreview?.role?.()||actualRole();
 const setRole=value=>{if(!Object.values(ROLES).includes(value))throw new Error('Unknown Factory OS role');if(window.VUSharedAccess?.membership?.())throw new Error('This device role is controlled by Shared Access Management.');localStorage.setItem(ROLE_KEY,value)};
 const settings=async()=>{const row=await getOne('settings','factory-os-operating');return{...DEFAULTS,...(row||{})}};
@@ -37,5 +38,5 @@ function requirements(snapshotData){
 
 function dispatchHealth(plannedValue,cfg=DEFAULTS){const value=money(plannedValue);return{value,belowMinimum:value<cfg.dailyDispatchMinimum,belowProfitTarget:value<cfg.dailyProfitTarget,minimumGap:Math.max(0,cfg.dailyDispatchMinimum-value),profitTargetGap:Math.max(0,cfg.dailyProfitTarget-value)}};
 
-window.VUFactoryOS={version:'1.2.0',ROLES,DEFAULTS,role,actualRole,setRole,settings,saveSettings,snapshot,requirements,dispatchHealth,orderRemainingValue,lineRequired};
+window.VUFactoryOS={version:'2.10.43',ROLES,DEFAULTS,role,actualRole,setRole,settings,saveSettings,snapshot,requirements,dispatchHealth,orderRemainingValue,lineRequired};
 })();
