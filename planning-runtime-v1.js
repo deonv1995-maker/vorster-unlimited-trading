@@ -40,11 +40,21 @@ function bindShell(){
  },true);
 }
 
+async function registerServiceWorker(){
+ if(!('serviceWorker' in navigator))return;
+ try{
+  const reg=await navigator.serviceWorker.register('sw.js',{updateViaCache:'none'});
+  await reg.update();
+  if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'});
+ }catch(err){console.warn('Planning Hub update check failed',err)}
+}
+
 async function boot(){
  const build=$('#runtimeBuild');if(build)build.textContent=BUILD;
  await openDB();
  await VUOrderDiary.seedKnownOrders();
  bindShell();
+ await registerServiceWorker();
  await route('home');
  $('#splash')?.remove();
  $('#app')?.classList.remove('hidden');
