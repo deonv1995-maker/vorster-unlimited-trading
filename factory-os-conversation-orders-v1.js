@@ -36,6 +36,26 @@ add({
 });
 
 add({
+ id:'planning-qu125024',
+ orderNumber:'QU125024',
+ customerName:'WATER PLANT CC',
+ customerCode:'WAT030',
+ source:'planning-diary',
+ status:'In progress',
+ orderDate:'2026-07-30',
+ dueDate:'2026-07-30',
+ fulfilmentType:'Collection',
+ preference:'Collection',
+ planningNote:'Part of the Water Plant outstanding collection group. Water Plant wants all outstanding orders complete before collection is arranged.',
+ orderTotalInclVat:493.21,
+ orderTotalExVat:428.88,
+ lines:[
+  {productCode:'DR023',productName:'DRIP ROUND 23CM',quantity:4,unitPrice:66.19,colourName:'Dry brush'},
+  {productCode:'DR025',productName:'DRIP ROUND 25CM',quantity:2,unitPrice:82.06,colourName:'Dry brush'}
+ ]
+});
+
+add({
  id:'planning-crisandra',
  customerName:'CRISANDRA',
  source:'planning-diary',
@@ -66,7 +86,7 @@ add({
  status:'In progress',
  fulfilmentType:'Collection',
  preference:'Collection',
- planningNote:'Large amount of ordered goods is ready and waiting. Customer wants all outstanding items across all orders complete before collection is arranged. Job card details still needed.',
+ planningNote:'Large amount of ordered goods is ready and waiting. Customer wants all outstanding items across all orders complete before collection is arranged. Additional Water Plant job cards can be added as separate orders under this customer group.',
  lines:[]
 });
 })();
