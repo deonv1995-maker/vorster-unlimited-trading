@@ -7,6 +7,14 @@ const orders=diary.knownOrders;
 const norm=v=>String(v??'').trim().toUpperCase();
 function key(o){return norm(o.orderNumber)||`CUSTOMER:${norm(o.customerName)}`}
 function add(order){const k=key(order);if(!orders.some(o=>key(o)===k))orders.push(order)}
+function patchOrder(orderNumber,patch){const found=orders.find(o=>norm(o.orderNumber)===norm(orderNumber));if(found)Object.assign(found,patch)}
+
+patchOrder('QU125071',{
+ plannedDate:'2026-08-20',
+ fulfilmentType:'Collection',
+ preference:'Collection',
+ planningNote:'Committed for Thursday morning collection. Use nominated quantity only to show how many ordered items are put aside/selected for this order.'
+});
 
 add({
  id:'planning-qu125074',
