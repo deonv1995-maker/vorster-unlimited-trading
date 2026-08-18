@@ -1,11 +1,11 @@
 {
-  "name": "Vorster Unlimited Trading",
-  "short_name": "Vorster Trading",
+  "name": "Vorster Unlimited Planning Hub",
+  "short_name": "Vorster Hub",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f6f5f2",
   "theme_color": "#35584a",
-  "description": "Vorster Unlimited Trading mobile business app",
+  "description": "Vorster Unlimited order diary, planning calendar and management information hub",
   "icons": [
     {
       "src": "vorster-logo.jpg",
